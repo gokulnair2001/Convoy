@@ -97,6 +97,112 @@ describe("Resolver", () => {
     const hit = await resolver.resolve("the sign in button", login, `tap "the sign in button"`);
     expect(hit.element.name).toBe("Sign in");
   });
+
+  it("asks Jev to match tap intent rather than the accessibility label", async () => {
+    let seen: JevRequest | undefined;
+    const jev: JevClient = {
+      async systemOne(request) {
+        seen = request;
+        return {
+          answers: {
+            present: { type: "noul", noul: 0.98 },
+            target: {
+              type: "choice",
+              choice: "e4",
+              probabilities: { e4: 0.93, none: 0.01 },
+            },
+          },
+        };
+      },
+    };
+    const resolver = new Resolver(jev, DEFAULT_GATES, "iOS · com.example.app");
+    await resolver.resolve("continue", login, `tap "continue"`);
+    const present = seen?.questions.present.instructions ?? "";
+    const target = seen?.questions.target.instructions ?? "";
+    expect(present).toMatch(/Action: tap/);
+    expect(present).toMatch(/Intent: continue/);
+    expect(present).toMatch(/visible label may differ/);
+    expect(target).toMatch(/primary forward CTA/);
+    expect(target).not.toMatch(/Which element in `elements` is: continue/);
+  });
+
+  it("does not apply forward-CTA synonym rules when typing into a field", async () => {
+    let seen: JevRequest | undefined;
+    const jev: JevClient = {
+      async systemOne(request) {
+        seen = request;
+        return {
+          answers: {
+            present: { type: "noul", noul: 0.98 },
+            target: {
+              type: "choice",
+              choice: "e2",
+              probabilities: { e2: 0.94, none: 0.01 },
+            },
+          },
+        };
+      },
+    };
+    const resolver = new Resolver(jev, DEFAULT_GATES, "iOS · com.example.app");
+    await resolver.resolve("Email", login, `type into "Email"`);
+    const instructions = seen?.questions.target.instructions ?? "";
+    expect(instructions).toMatch(/Action: type/);
+    expect(instructions).toMatch(/Intent: Email/);
+    expect(instructions).not.toMatch(/primary forward CTA/);
+  });
+});
+
+describe("heuristic tap intent", () => {
+  const resolver = () => new Resolver(new HeuristicJevClient(), DEFAULT_GATES, "iOS · com.example.app");
+
+  it("taps Sign in when the author says continue and no Continue label exists", async () => {
+    const hit = await resolver().resolve("continue", login, `tap "continue"`);
+    expect(hit.element.name).toBe("Sign in");
+    expect(hit.element.id).toBe("e4");
+  });
+
+  it("taps Continue when the author says log in and that is the unique forward button", async () => {
+    const screen: Element[] = [
+      el("e1", "button", "Back"),
+      el("e2", "textfield", "Email"),
+      el("e3", "textfield", "Password"),
+      el("e4", "button", "Continue"),
+      el("e5", "button", "Forgot password?"),
+    ];
+    const hit = await resolver().resolve("log in", screen, `tap "log in"`);
+    expect(hit.element.name).toBe("Continue");
+  });
+
+  it("prefers a visible Continue label over a Log in button", async () => {
+    const screen: Element[] = [
+      el("e1", "button", "Back"),
+      el("e4", "button", "Continue"),
+      el("e5", "button", "Log in"),
+    ];
+    const hit = await resolver().resolve("continue", screen, `tap "continue"`);
+    expect(hit.element.name).toBe("Continue");
+  });
+
+  it("taps Continue as guest only when the phrase names it", async () => {
+    const screen: Element[] = [
+      el("e4", "button", "Continue"),
+      el("e5", "button", "Continue as guest"),
+    ];
+    const guest = await resolver().resolve("continue as guest", screen, `tap "continue as guest"`);
+    expect(guest.element.name).toBe("Continue as guest");
+    const forward = await resolver().resolve("continue", screen, `tap "continue"`);
+    expect(forward.element.name).toBe("Continue");
+  });
+
+  it("does not tap a side action or invent a match for a specific missing control", async () => {
+    await expect(resolver().resolve("the submit invoice button", login, `tap "the submit invoice button"`)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+
+  it("does not treat type-into as a forward CTA", async () => {
+    await expect(resolver().resolve("continue", login, `type into "continue"`)).rejects.toBeInstanceOf(NotFoundError);
+  });
 });
 
 describe("textFieldForTyping", () => {

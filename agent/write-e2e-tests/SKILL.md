@@ -24,7 +24,7 @@ File name **must** end in `.e2e.yaml`, `.e2e.yml`, or `.e2e.ts`. A plain `.yaml`
 
 1. Restate the flow as ordered human actions (tap / type / see). Drop implementation detail.
 2. Prefer YAML. Use TypeScript only if the flow needs logic YAML cannot express.
-3. Phrase intents from `convoy inspect` labels when a device/fixture is available. Otherwise use the visible label the user named.
+3. Write the goal a person means (`continue`, `log in`, `the email field`). Copy an `inspect` label only when two controls could fit.
 4. Put secrets in `.env`. YAML: `type: ${NAME}`. TypeScript: `process.env.NAME` (throw if unset). Never hardcode passwords.
 5. Write the file. Do not add `e2e.beforeEach(() => t.resetApp())` — Convoy already resets between tests.
 6. One flow = one test. Ordered screens in TypeScript use `e2e.serial`, not a new `e2e()` per screen.
@@ -46,9 +46,9 @@ Do **not** invent waits, sleeps, locators, `getByRole`, `testId`, or `waitForSel
 
 ## Phrase intents
 
-- Copy the **name** column from `npx convoy inspect` (or `npm run convoy -- inspect` in this repo).
-- Good: `"Continue"`, `"Email / Username"`, `"the home screen"`.
-- Bad: `"button[0]"`, `"#login"`, `"com.example:id/continue"`, `"the blue button in the nav"`.
+- Write the action, not a selector. `"continue"` is enough when that is the unique forward button, even if the label is **Log in** or **Next**.
+- If a control with that name is on screen, that control wins (`tap: continue` → **Continue**, not **Log in**). Name **log in** when that is the button you want.
+- `inspect` is for disambiguation, not a required vocabulary. Bad: `"button[0]"`, `"#login"`, `"com.example:id/continue"`, `"the blue button in the nav"`.
 - If the gate returns **ambiguous**, tighten the phrase to the inspect label. If **not found**, the control is missing, unlabelled, or still loading — do not add a wait.
 
 ## YAML shape
@@ -115,5 +115,5 @@ TS-only: `t.platform({ ios, android, web })`, `t.score(intent, { min })`, `t.res
 
 - Write the test file. Do not dump the YAML/TS only in chat unless the user asked for a snippet.
 - If `.env` needs a new name (`USERNAME`, `API_TOKEN`, …), say so. Do not invent a value.
-- If inspect labels are unknown, write the test from the user's wording and tell them to rephrase after `convoy inspect`.
+- If inspect labels are unknown, write the goal the user named (`continue`, `the email field`). Rephrase from `convoy inspect` only if the run is **ambiguous**.
 - Do not add unit tests under `tests/unit/` for product flows. Those test Convoy itself.

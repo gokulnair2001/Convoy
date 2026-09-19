@@ -27,18 +27,19 @@ export class Resolver {
     for (const el of elements) {
       criteria[el.id] = `${el.role} "${el.name}"${el.value ? ` value=${JSON.stringify(el.value)}` : ""}`;
     }
-    criteria.none = "No element matches";
+    criteria.none = "No unique control fulfills the intent";
+    const action = actionFromStep(step);
 
     const request: JevRequest = {
       state: buildJevState(this.screenLabel, elements, { includeValues: true }),
       questions: {
         present: {
           type: "noul",
-          instructions: `Does \`elements\` contain a match for: ${intent}?`,
+          instructions: resolveInstructions("present", action, intent),
         },
         target: {
           type: "choice",
-          instructions: `Which element in \`elements\` is: ${intent}?`,
+          instructions: resolveInstructions("target", action, intent),
           criteria,
         },
       },
@@ -79,4 +80,23 @@ export class Resolver {
       response,
     };
   }
+}
+
+export type ResolveAction = "tap" | "type";
+
+export function actionFromStep(step: string): ResolveAction {
+  return /^\s*type\b/i.test(step) ? "type" : "tap";
+}
+
+/** Shared footer so the heuristic client can parse action + phrase. */
+export function resolveInstructions(kind: "present" | "target", action: ResolveAction, intent: string): string {
+  const rules =
+    action === "tap"
+      ? "The author's phrase is an intent; the visible label may differ. If one control's visible name matches the phrase (ignore case and punctuation), pick that control. If none match, the unique primary forward CTA (continue, next, submit, log in, sign in, done, save) may match even when the label differs. Side actions (Forgot password, Continue as guest, Use SSO, Create account) only match when the phrase names them. If two controls fit equally, pick none."
+      : "The author's phrase is an intent; the visible label may differ. If one field's visible name matches the phrase (ignore case and punctuation), pick that field. Prefer text fields. If two fields fit equally, pick none.";
+  const ask =
+    kind === "present"
+      ? `Does \`elements\` contain a unique ${action === "type" ? "field" : "control"} that fulfills this ${action}?`
+      : `Which ${action === "type" ? "field" : "control"} in \`elements\` should be used to ${action}?`;
+  return `${ask} ${rules}\nAction: ${action}\nIntent: ${intent}`;
 }

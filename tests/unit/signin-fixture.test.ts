@@ -46,6 +46,22 @@ describe("signin fixture flow", () => {
     }
   });
 
+  it("taps Continue when the author says log in and that is the only forward button", async () => {
+    const session = await sessionFor("tests/fixtures/signin.json", "driver signs in by intent");
+    try {
+      const t = session.steps;
+      await t.resetApp();
+      await t.tap("the sign in button");
+      await t.type("test@example.com", { into: "the email field" });
+      await t.type("Passw0rd!", { into: "the password field" });
+      await t.tap("log in");
+      await t.see("the trip list screen");
+    } finally {
+      await session.tracer.finish("pass");
+      await session.close();
+    }
+  });
+
   it("surfaces an ambiguous continue as a spec problem", async () => {
     const tracesDir = await mkdtemp(path.join(os.tmpdir(), "convoy-"));
     dirs.push(tracesDir);

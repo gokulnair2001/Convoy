@@ -99,7 +99,7 @@ Convoy will boot the iOS simulator, install, and launch. It will **not** start a
 ## Authoring loop
 
 1. Get the app to the screen (or `run` until it fails there).
-2. `convoy inspect` — copy labels into step intents.
+2. `convoy inspect` — use labels when two controls could fit; otherwise the action (`continue`, `log in`) is enough.
 3. `convoy capture --name …` for offline fixtures.
 4. Re-run. Tests must pass alone and in any order (default reset: `relaunch`).
 
