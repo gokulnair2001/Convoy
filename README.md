@@ -27,6 +27,7 @@ Package: `convoy-e2e` · CLI: `convoy` · Node 20+
 - [Configuration](#configuration)
 - [Platforms](#platforms)
 - [Writing tests](#writing-tests)
+- [AI agents](#ai-agents)
 - [CLI reference](#cli-reference)
 - [Lifecycle (boot / build / install / launch)](#lifecycle-boot--build--install--launch)
 - [Jev](#jev)
@@ -447,6 +448,19 @@ Tests must pass alone and in any order. Default reset between tests is `relaunch
 
 ---
 
+## AI agents
+
+This repo ships skills any coding agent can load:
+
+| Skill | Path |
+|---|---|
+| Install, configure, run, inspect, debug | `agent/use-convoy/SKILL.md` |
+| Natural-language flow → `*.e2e.yaml` / `*.e2e.ts` | `agent/write-e2e-tests/SKILL.md` |
+
+Root `AGENTS.md` points at those files. After `npm install -D convoy-e2e`, copy `agent/` into the app repo (or keep `node_modules/convoy-e2e/agent/` on the agent's include path).
+
+---
+
 ## CLI reference
 
 Installed package: `npx convoy <command>`. This repo: `npm run convoy -- <command>`.
@@ -696,6 +710,7 @@ Layout:
 | `src/runner/` | `e2e`, session, steps, reporter |
 | `src/yaml/` | YAML → `Steps` |
 | `examples/auth/` | Sign-in (YAML + TypeScript) |
+| `agent/` | Skills for coding agents (use Convoy + write tests) |
 | `tests/unit/` | Offline unit tests |
 | `tests/fixtures/` | Recorded screens |
 
