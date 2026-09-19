@@ -202,10 +202,60 @@ export function tokenize(text: string): string[] {
     .filter((w) => w.length > 0 && !STOP.has(w));
 }
 
+const NAME_MATCH = 0.55;
+const CTA_SCORE = 0.78;
+const ADVANCE_STRONG = new Set([
+  "continue",
+  "next",
+  "proceed",
+  "submit",
+  "login",
+  "signin",
+  "log",
+  "sign",
+  "done",
+  "save",
+  "apply",
+  "start",
+  "started",
+  "ok",
+  "okay",
+]);
+const ADVANCE_WEAK = new Set(["get", "go", "lets", "let"]);
+
 function intentFromInstructions(instructions: string): string {
+  const line = instructions.match(/^Intent:\s*(.+)$/m);
+  if (line) return line[1]!.trim();
   const quoted = instructions.match(/:\s*(.+?)\??$/);
   if (quoted) return quoted[1]!.trim();
   return instructions;
+}
+
+function isTapResolve(instructions: string): boolean {
+  return /^Action:\s*tap\b/m.test(instructions);
+}
+
+function isBareAdvanceIntent(intent: string): boolean {
+  const tokens = tokenize(intent);
+  if (tokens.length === 0) return false;
+  if (!tokens.every((t) => ADVANCE_STRONG.has(t) || ADVANCE_WEAK.has(t))) return false;
+  return tokens.some((t) => ADVANCE_STRONG.has(t));
+}
+
+function isSideAction(name: string): boolean {
+  const n = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  if (/forgot|sso|\bguest\b|create account|sign up|\bregister\b|already have|not now|\bskip\b/.test(n)) {
+    return true;
+  }
+  return /^(back|close|cancel|menu|more)$/.test(n);
+}
+
+function isPrimaryForwardCta(el: { name: string; role?: string }): boolean {
+  if (el.role !== "button" && el.role !== "link") return false;
+  return !isSideAction(el.name);
 }
 
 function scoreName(intent: string, name: string, role?: string): number {
@@ -223,6 +273,21 @@ function scoreName(intent: string, name: string, role?: string): number {
   return Math.max(0, coverage * 0.6 + jaccard * 0.4 + exact + roleBonus(intent, role) - extra * 0.35);
 }
 
+function scoreElement(
+  intent: string,
+  el: { id: string; name: string; role?: string },
+  opts: { tap: boolean; elements: Array<{ id: string; name: string; role?: string }> },
+): number {
+  const base = scoreName(intent, el.name, el.role);
+  if (!opts.tap) return base;
+  const bestName = Math.max(0, ...opts.elements.map((e) => scoreName(intent, e.name, e.role)));
+  if (bestName >= NAME_MATCH) return base;
+  if (!isBareAdvanceIntent(intent)) return base;
+  const ctas = opts.elements.filter((e) => isPrimaryForwardCta(e));
+  if (ctas.length === 1 && ctas[0]!.id === el.id) return Math.max(base, CTA_SCORE);
+  return base;
+}
+
 function roleBonus(intent: string, role?: string): number {
   if (!role) return 0;
   const i = intent.toLowerCase();
@@ -234,10 +299,12 @@ function roleBonus(intent: string, role?: string): number {
   return 0;
 }
 
-function noulHeuristic(instructions: string, elements: Array<{ name: string; role?: string }>): number {
+function noulHeuristic(instructions: string, elements: Array<{ id: string; name: string; role?: string }>): number {
   const intent = intentFromInstructions(instructions);
-  const negated = /\bnot\b|\babsent\b|\bno\b/.test(instructions.toLowerCase());
-  const scores = elements.map((e) => scoreName(intent, e.name, e.role));
+  const tap = isTapResolve(instructions);
+  const negated =
+    !/^Action:\s/m.test(instructions) && /\bnot\b|\babsent\b|\bno\b/.test(instructions.toLowerCase());
+  const scores = elements.map((e) => scoreElement(intent, e, { tap, elements }));
   const best = Math.max(0, ...scores);
   let p = best >= 0.55 ? 0.96 : best >= 0.3 ? 0.7 : 0.06;
   if (/error message|error banner|alert/.test(intent.toLowerCase()) && best < 0.3) p = 0.04;
@@ -252,6 +319,7 @@ function choiceHeuristic(
   elements: Array<{ id: string; name: string; role?: string }>,
 ): ChoiceAnswerRawLike {
   const intent = intentFromInstructions(instructions);
+  const tap = isTapResolve(instructions);
   const ids = Object.keys(criteria);
   const scores: Record<string, number> = {};
   for (const id of ids) {
@@ -261,7 +329,7 @@ function choiceHeuristic(
     }
     const el = elements.find((e) => e.id === id);
     if (el) {
-      scores[id] = scoreName(intent, el.name, el.role);
+      scores[id] = scoreElement(intent, el, { tap, elements });
     } else {
       const criterion = criteria[id] ?? id;
       scores[id] = Math.max(0, ...elements.map((e) => scoreName(criterion, e.name, e.role)));

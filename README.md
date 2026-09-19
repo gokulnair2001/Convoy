@@ -378,7 +378,7 @@ steps:                         # required, non-empty
 | `back: true` | Platform back |
 | `which: { intent: [steps], … }` | Wait until one of ≥2 screens is present, then run that branch |
 
-Phrase intents like a human: `"Continue"`, `"the home screen"`. If Jev returns **ambiguous**, disambiguate the phrase (`inspect` shows the labels it can see).
+Phrase intents like a human: `"continue"`, `"the home screen"`. A unique on-screen name still wins; if that name is missing, tap may resolve the unique forward CTA (continue / next / log in). If Jev returns **ambiguous**, disambiguate the phrase (`inspect` shows the labels it can see).
 
 `${NAME}` on `type` is expanded when the step runs. Listing or parsing tests does not require those secrets to be set. If a token is still unset at run time, Convoy tells you to add it to `.env`.
 
@@ -433,7 +433,7 @@ Do not write a separate `e2e()` per screen of one flow — each `e2e()` resets t
 ### Authoring loop
 
 1. Get the app to the screen you care about (or `convoy run` until it fails there).
-2. `npx convoy inspect` — copy labels from the table into step intents.
+2. `npx convoy inspect` — use labels when two controls could fit; the action (`continue`) is enough when it is unique.
 3. `npx convoy capture --name login-screen` — save a fixture + screenshot under `.convoy/captures/` for later offline work.
 4. Re-run. If the gate says **ambiguous**, the phrase matches two controls; tighten it. If **not found**, the control is missing or the dump dropped it.
 
