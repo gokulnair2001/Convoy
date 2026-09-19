@@ -20,6 +20,11 @@ steps:
 
 Package: `convoy-e2e` · CLI: `convoy` · Node 20+
 
+Using a coding agent? Give it the skill files first so it can set up Convoy and write tests without inventing locators:
+
+- Setup, `init` / `doctor` / `run` / `inspect`: [agent/use-convoy/SKILL.md](agent/use-convoy/SKILL.md)
+- Natural-language flow → `*.e2e.yaml` / `*.e2e.ts`: [agent/write-e2e-tests/SKILL.md](agent/write-e2e-tests/SKILL.md)
+
 - [How it works](#how-it-works)
 - [Prerequisites](#prerequisites)
 - [Install](#install)
