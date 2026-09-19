@@ -35,6 +35,7 @@ Package: `convoy-e2e` · CLI: `convoy` · Node 20+
 - [Traces](#traces)
 - [CI](#ci)
 - [Troubleshooting](#troubleshooting)
+- [Download packages](#download-packages)
 - [Development](#development)
 
 ---
@@ -57,48 +58,27 @@ The same test file can target iOS, Android, and web. Phrase steps against what a
 
 ## Prerequisites
 
-| You need | Why |
+You only need what the platform you are targeting uses. Convoy boots / installs / launches the **app**; it does not install these tools. `npx convoy doctor` lists anything missing. Install commands: [Download packages](#download-packages).
+
+| | Required |
 |---|---|
-| Node.js 20+ | Runtime |
-| A TypeSafe **Jev API key** | Live matching. Fixture + heuristic mode work without one |
-
-**iOS (simulator on a Mac)**
-
-- Xcode, with at least one iPhone simulator
-- A **simulator** build of the app (`.app`, not a device `.ipa`)
-- Facebook `idb` (companion + CLI):
-
-```bash
-brew tap facebook/fb
-brew install idb-companion
-pip3 install fb-idb
-idb --help
-```
-
-**Android**
-
-- Android SDK `adb`
-- A running emulator or device
-- An APK (`CONVOY_ANDROID_APK`) if Convoy should install it
-
-**Web**
-
-```bash
-npm install playwright
-npx playwright install chromium
-```
+| **All** | [Node.js 20+](#nodejs) · TypeSafe Jev API key for live matching ([Jev](#jev)) |
+| **Fixture** | Nothing else (recorded screen JSON; no device, no key) |
+| **iOS** | Xcode · iPhone simulator · simulator `.app` · [Facebook idb](#facebook-idb) |
+| **Android** | [adb](#android-sdk-adb) · already-running emulator or device · APK if Convoy should install it |
+| **Web** | [Playwright Chromium](#playwright-chromium) if the browser is missing after `npm install` |
 
 ---
 
 ## Install
 
-In the test project (or app repo):
+Add the published package to **your** test project (or app repo). You do not clone this repo to run tests.
 
 ```bash
 npm install -D convoy-e2e
 ```
 
-Then:
+That registers the `convoy` CLI. Call it with `npx`:
 
 ```bash
 npx convoy init --platform ios --yes
@@ -106,9 +86,19 @@ npx convoy doctor
 npx convoy run
 ```
 
-`init` writes `convoy.config.json`, `.env`, and a sample test in **that** project. Do not put secrets in `convoy.config.json`. TypeScript tests import `{ e2e } from "convoy-e2e"`. The CLI is still `convoy`.
+npm scripts can use the `convoy` binary directly (`node_modules/.bin` is on PATH there), then `npm run e2e`:
 
-### This repo
+```json
+{
+  "scripts": {
+    "e2e": "convoy run"
+  }
+}
+```
+
+`init` writes `convoy.config.json`, `.env`, and a sample test in **that** project. Do not put secrets in `convoy.config.json`. TypeScript tests import `{ e2e } from "convoy-e2e"`. The package name is `convoy-e2e`; the CLI binary is `convoy`.
+
+### This repo (contributors)
 
 ```bash
 git clone <this-repo>
@@ -116,7 +106,7 @@ cd Convoy
 npm install
 ```
 
-Local CLI while hacking on Convoy: `npm run convoy -- …`. After `npm run build`, `npx convoy` uses `dist/`.
+While hacking on Convoy itself, `npm run convoy -- …` runs TypeScript from `src/`. After `npm run build`, `npx convoy` uses `dist/`.
 
 ---
 
@@ -127,8 +117,6 @@ Local CLI while hacking on Convoy: `npm run convoy -- …`. After `npm run build
 ```bash
 npx convoy init --platform fixture --yes
 ```
-
-In this repo you can use `npm run convoy -- init --platform fixture --yes` instead.
 
 `--platform fixture` is offline (recorded screen, no device, no API key). For a real app use `ios`, `android`, or `web`. `--yes` skips the platform prompt. Invalid platform exits `1` and writes nothing.
 
@@ -157,7 +145,7 @@ YAML interpolates them as `${NAME}`. TypeScript reads `process.env.NAME`.
 ### 3. Check the machine
 
 ```bash
-npm run convoy -- doctor
+npx convoy doctor
 ```
 
 Required checks (Node, package, config) should pass. Missing `idb` / `adb` / Playwright / API key are **warnings**. Doctor also prints a resolved block (platform, bundle, UDID, binary path, Jev mode) with the API key shown only as `set` / `not set`.
@@ -165,17 +153,16 @@ Required checks (Node, package, config) should pass. Missing `idb` / `adb` / Pla
 ### 4. Run
 
 ```bash
-npm test                              # unit tests (offline, fixture + heuristic)
-npm run convoy -- inspect             # element table for the current screen
-npm run convoy -- run examples/auth/signin.e2e.yaml
+npx convoy inspect                    # element table for the current screen
+npx convoy run                        # every *.e2e.ts / *.e2e.yaml in the project
 ```
 
-This repo ships **two** sign-in examples (YAML and TypeScript) with the same flow. Pass **one** file so both do not hit the device:
+This repo also ships **two** sign-in examples (YAML and TypeScript) with the same flow. Pass **one** file so both do not hit the device:
 
 ```bash
-npm run convoy -- run examples/auth/signin.e2e.yaml
+npx convoy run examples/auth/signin.e2e.yaml
 # or
-npm run convoy -- run examples/auth/signin.e2e.ts
+npx convoy run examples/auth/signin.e2e.ts
 ```
 
 ---
@@ -265,8 +252,8 @@ Any other `NAME=value` pair in `.env` is yours. Convoy does not prescribe applic
 No device, no API key. Uses `tests/fixtures/signin.json` (or `fixture.path` in config). Good for unit tests and CI of Convoy itself.
 
 ```bash
-CONVOY_PLATFORM=fixture npm run convoy -- inspect
-CONVOY_PLATFORM=fixture npm run convoy -- run examples/auth/signin.e2e.ts
+CONVOY_PLATFORM=fixture npx convoy inspect
+CONVOY_PLATFORM=fixture npx convoy run examples/auth/signin.e2e.ts
 ```
 
 Without `TYPESAFE_API_KEY`, Jev is the local heuristic client.
@@ -292,8 +279,8 @@ TYPESAFE_API_KEY=…
 Then:
 
 ```bash
-npm run convoy -- doctor
-npm run convoy -- run examples/auth/signin.e2e.yaml --headed
+npx convoy doctor
+npx convoy run examples/auth/signin.e2e.yaml --headed
 ```
 
 On `run`, Convoy will:
@@ -332,7 +319,7 @@ CONVOY_WEB_BASE_URL=http://localhost:3000
 # optional: CONVOY_WEB_SERVER="npm run start"
 ```
 
-Playwright Chromium. If `web.server.command` (or `CONVOY_WEB_SERVER`) is set, Convoy spawns it and waits until the URL responds.
+Playwright Chromium (installed with `convoy-e2e`). If `web.server.command` (or `CONVOY_WEB_SERVER`) is set, Convoy spawns it and waits until the URL responds. If Chromium is missing, see [Playwright Chromium](#playwright-chromium).
 
 ---
 
@@ -440,8 +427,8 @@ Do not write a separate `e2e()` per screen of one flow — each `e2e()` resets t
 ### Authoring loop
 
 1. Get the app to the screen you care about (or `convoy run` until it fails there).
-2. `npm run convoy -- inspect` — copy labels from the table into step intents.
-3. `npm run convoy -- capture --name login-screen` — save a fixture + screenshot under `.convoy/captures/` for later offline work.
+2. `npx convoy inspect` — copy labels from the table into step intents.
+3. `npx convoy capture --name login-screen` — save a fixture + screenshot under `.convoy/captures/` for later offline work.
 4. Re-run. If the gate says **ambiguous**, the phrase matches two controls; tighten it. If **not found**, the control is missing or the dump dropped it.
 
 Tests must pass alone and in any order. Default reset between tests is `relaunch`.
@@ -463,12 +450,12 @@ Root `AGENTS.md` points at those files. After `npm install -D convoy-e2e`, copy 
 
 ## CLI reference
 
-Installed package: `npx convoy <command>`. This repo: `npm run convoy -- <command>`.
+Use `npx convoy <command>` after `npm install -D convoy-e2e`. Contributors hacking this repo can use `npm run convoy -- <command>` instead.
 
 ### `init`
 
 ```bash
-npm run convoy -- init --platform ios --yes
+npx convoy init --platform ios --yes
 ```
 
 | Flag | Meaning |
@@ -481,7 +468,7 @@ Without flags, asks one question (platform) when stdin is a TTY; otherwise defau
 ### `run`
 
 ```bash
-npm run convoy -- run [files…] [options]
+npx convoy run [files…] [options]
 ```
 
 | You pass | What runs |
@@ -494,8 +481,8 @@ npm run convoy -- run [files…] [options]
 `node_modules`, `dist`, `.convoy`, and `.git` are skipped. An empty folder exits `1` instead of running the rest of the project.
 
 ```bash
-npm run convoy -- run tests/regression
-npm run convoy -- run examples/auth/signin.e2e.yaml
+npx convoy run tests/regression
+npx convoy run examples/auth/signin.e2e.yaml
 ```
 
 | Flag | Meaning |
@@ -541,7 +528,7 @@ Print the labelled element table for the current screen (after the same boot/ins
 ### `capture`
 
 ```bash
-npm run convoy -- capture --name login-screen --out .convoy/captures
+npx convoy capture --name login-screen --out .convoy/captures
 ```
 
 Writes `<name>.json` (normalized elements + raw dump) and `<name>.png`.
@@ -658,7 +645,7 @@ Same layout locally and in CI. The CLI prints the traces path on failure. `.conv
 ## CI
 
 ```bash
-npm run convoy -- run --headless --junit --shard 1/4
+npx convoy run --headless --junit --shard 1/4
 ```
 
 - Inject `TYPESAFE_API_KEY` and any application secrets from the secret store. Do not commit `.env`.
@@ -674,7 +661,7 @@ npm run convoy -- run --headless --junit --shard 1/4
 |---|---|
 | `Set API_TOKEN in .env` | YAML `type: ${API_TOKEN}` with that name unset |
 | `doctor` warns `TYPESAFE_API_KEY not set` | Live Jev disabled; fixture still works |
-| `idb` / `adb` not found | Install tools; doctor shows warnings, not a hard fail |
+| `idb` / `adb` not found | Install tools in [Download packages](#download-packages); doctor shows warnings, not a hard fail |
 | Prepare fails on iOS | Xcode CLT, a simulator exists, `CONVOY_IOS_UDID` matches a **booted or bootable** iPhone |
 | App does not appear | `CONVOY_IOS_APP` / `CONVOY_ANDROID_APK` path exists; `lifecycle.install` / `launch` are true |
 | Stuck on a spinner | Raise `CONVOY_ACTION_TIMEOUT_MS`; the failure log lists `on screen` labels |
@@ -685,6 +672,66 @@ npm run convoy -- run --headless --junit --shard 1/4
 | Jev spam on the terminal | Default is off. Unset `CONVOY_DEBUG_JEV` or set it to `0` |
 | `init` did not change `.env` | Existing `.env` is never overwritten. Edit it by hand |
 | Wrong simulator | `doctor` resolved UDID; set `CONVOY_IOS_UDID` in `.env`, not in committed JSON |
+
+---
+
+## Download packages
+
+Install commands for the tools listed in [Prerequisites](#prerequisites). Skip anything you already have. `npx convoy doctor` prints what is missing.
+
+### Node.js
+
+Need v20 or newer (`node -v`). npm ships with it.
+
+```bash
+# macOS (Homebrew)
+brew install node
+
+# any OS (nvm) — https://github.com/nvm-sh/nvm
+nvm install 20
+```
+
+Or the LTS installer from [nodejs.org](https://nodejs.org).
+
+### Facebook idb
+
+iOS only. Companion + CLI.
+
+```bash
+brew tap facebook/fb
+brew install idb-companion
+pip3 install fb-idb
+idb --help
+```
+
+Also need **Xcode** (Mac App Store) and command-line tools:
+
+```bash
+xcode-select --install
+xcrun simctl list devices available
+```
+
+The app binary must be a **simulator** `.app`, not a device `.ipa`.
+
+### Android SDK (adb)
+
+```bash
+# macOS (Homebrew)
+brew install --cask android-platform-tools
+
+adb start-server
+adb devices
+```
+
+Or install [Android Studio](https://developer.android.com/studio) / SDK `platform-tools` and put `adb` on `PATH`. Start an emulator (or plug in a device) yourself — Convoy will not create or boot an AVD.
+
+### Playwright Chromium
+
+The Playwright npm package ships as an optional dependency of `convoy-e2e`. If Chromium is missing after `npm install`:
+
+```bash
+npx playwright install chromium
+```
 
 ---
 
