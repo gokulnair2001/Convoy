@@ -1,0 +1,59 @@
+# Filename must match the Trusted Publisher "Workflow filename" on npmjs.com (release.yml).
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Semver increment
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, 'chore: release')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+
+      - name: Use npm 11 (OIDC trusted publishing)
+        run: npm install -g npm@11
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+
+      - name: Bump version, tag, and push
+        id: bump
+        env:
+          BUMP: ${{ github.event.inputs.bump || 'patch' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          TAG=$(npm version "$BUMP" -m "chore: release %s [skip ci]")
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          git push origin HEAD --follow-tags
+
+      - run: npm publish --access public
+
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${{ steps.bump.outputs.tag }}" --generate-notes --title "${{ steps.bump.outputs.tag }}"

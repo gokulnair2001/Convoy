@@ -4,7 +4,7 @@ import path from "node:path";
 export default defineConfig({
   resolve: {
     alias: {
-      "convoy": path.resolve("src/index.ts"),
+      "convoy-e2e": path.resolve("src/index.ts"),
     },
   },
   test: {

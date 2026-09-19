@@ -15,7 +15,7 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "convoy": ["./src/index.ts"]
+      "convoy-e2e": ["./src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "tests/**/*.ts", "examples/**/*.ts", "vitest.config.ts"]

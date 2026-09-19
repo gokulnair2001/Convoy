@@ -1,5 +1,5 @@
 {
-  "name": "convoy",
+  "name": "convoy-e2e",
   "version": "0.1.0",
   "description": "One test. Three platforms. Zero locators — e2e that taps what the user sees.",
   "type": "module",
@@ -17,6 +17,8 @@
   "files": [
     "dist",
     "README.md",
+    "AGENTS.md",
+    "agent",
     ".env.example"
   ],
   "engines": {
@@ -38,7 +40,15 @@
     "playwright",
     "jev"
   ],
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gokulnair2001/Convoy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gokulnair2001/Convoy/issues"
+  },
+  "homepage": "https://github.com/gokulnair2001/Convoy#readme",
   "dependencies": {
     "commander": "^12.1.0",
     "dotenv": "^16.4.5",
