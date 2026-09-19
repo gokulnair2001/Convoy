@@ -41,6 +41,14 @@
     "jev"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gokulnair2001/Convoy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gokulnair2001/Convoy/issues"
+  },
+  "homepage": "https://github.com/gokulnair2001/Convoy#readme",
   "dependencies": {
     "commander": "^12.1.0",
     "dotenv": "^16.4.5",

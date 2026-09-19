@@ -36,6 +36,7 @@ Package: `convoy-e2e` · CLI: `convoy` · Node 20+
 - [CI](#ci)
 - [Troubleshooting](#troubleshooting)
 - [Download packages](#download-packages)
+- [Publishing](#publishing)
 - [Development](#development)
 
 ---
@@ -732,6 +733,56 @@ The Playwright npm package ships as an optional dependency of `convoy-e2e`. If C
 ```bash
 npx playwright install chromium
 ```
+
+---
+
+## Publishing
+
+Day-to-day work stays on `develop`. Merging to `main` is a release: GitHub Actions bumps the patch version, tags the repo, creates a GitHub Release, and publishes `convoy-e2e` to npm. For a minor or major bump, run the **Release** workflow by hand and pick the increment.
+
+No npm token is stored in GitHub. Publishes from Actions use [trusted publishing](https://docs.npmjs.com/trusted-publishers/) (OIDC).
+
+### 1. First publish (once, from your machine)
+
+The package must exist on npm before you can attach a trusted publisher.
+
+```bash
+npm login
+npm whoami
+npm test
+npm publish --access public
+```
+
+That ships the current `package.json` version (`0.1.0` until the first Action run bumps it). Confirm: [npmjs.com/package/convoy-e2e](https://www.npmjs.com/package/convoy-e2e).
+
+### 2. Trust this repo on npm
+
+On [npmjs.com](https://www.npmjs.com) → **convoy-e2e** → **Settings** → **Trusted Publisher**:
+
+| Field | Value |
+|---|---|
+| Provider | GitHub Actions |
+| Organization or user | `gokulnair2001` |
+| Repository | `Convoy` |
+| Workflow filename | `release.yml` |
+| Environment | leave empty |
+| Allowed actions | `npm publish` |
+
+The filename must be exactly `release.yml` (not the `.github/workflows/` path).
+
+### 3. After that
+
+Merge a PR into `main` (or merge `develop` → `main`). The [Release](.github/workflows/release.yml) workflow:
+
+1. Runs unit tests and typecheck
+2. `npm version patch` (or the increment you chose on a manual run)
+3. Pushes `vX.Y.Z` and a `chore: release` commit
+4. `npm publish`
+5. Opens a GitHub Release with generated notes
+
+If `main` requires pull requests, allow GitHub Actions to push (or let `github-actions[bot]` bypass that rule). Otherwise the version commit cannot land.
+
+Do not put an npm token in the repo or in `convoy.config.json`.
 
 ---
 
