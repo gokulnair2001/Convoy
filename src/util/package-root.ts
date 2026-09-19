@@ -30,7 +30,7 @@ export function readPackageJson(root: string): PackageJson {
     version?: string;
   };
   return {
-    name: raw.name ?? "convoy",
+    name: raw.name ?? "convoy-e2e",
     version: raw.version ?? "0.0.0",
   };
 }

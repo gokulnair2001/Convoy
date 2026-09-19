@@ -18,7 +18,7 @@ steps:
   - see: the home screen
 ```
 
-Package: `convoy` · CLI: `convoy` · Node 20+
+Package: `convoy-e2e` · CLI: `convoy` · Node 20+
 
 - [How it works](#how-it-works)
 - [Prerequisites](#prerequisites)
@@ -94,7 +94,7 @@ npx playwright install chromium
 In the test project (or app repo):
 
 ```bash
-npm install -D convoy
+npm install -D convoy-e2e
 ```
 
 Then:
@@ -105,9 +105,7 @@ npx convoy doctor
 npx convoy run
 ```
 
-`init` writes `convoy.config.json`, `.env`, and a sample test in **that** project. Do not put secrets in `convoy.config.json`.
-
-The unscoped name `convoy` is already taken on registry.npmjs.org. Before you publish, set `"name"` in this package’s `package.json` to a unique name or `@your-user/convoy` you own. The CLI binary stays `convoy`. After a rename, consumers `npm install -D <that-name>` and still `import { e2e } from "<that-name>"` (`init` uses the package name).
+`init` writes `convoy.config.json`, `.env`, and a sample test in **that** project. Do not put secrets in `convoy.config.json`. TypeScript tests import `{ e2e } from "convoy-e2e"`. The CLI is still `convoy`.
 
 ### This repo
 
@@ -393,7 +391,7 @@ Phrase intents like a human: `"Continue"`, `"the home screen"`. If Jev returns *
 ### TypeScript
 
 ```ts
-import { e2e } from "convoy";
+import { e2e } from "convoy-e2e";
 
 e2e("driver signs in", { platforms: ["ios"], tags: ["smoke"] }, async (t) => {
   await t.type(process.env.API_TOKEN!, { into: "the search field" });

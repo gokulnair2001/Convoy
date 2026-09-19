@@ -51,7 +51,7 @@ describe("initCommand", () => {
     expect(existsSync(path.join(cwd, ".env"))).toBe(true);
     expect(existsSync(path.join(cwd, "tests", "sample.e2e.ts"))).toBe(true);
     const sample = await readFile(path.join(cwd, "tests", "sample.e2e.ts"), "utf8");
-    expect(sample).toContain('import { e2e } from "convoy"');
+    expect(sample).toContain('import { e2e } from "convoy-e2e"');
 
     const config = JSON.parse(await readFile(path.join(cwd, "convoy.config.json"), "utf8")) as {
       platform: string;

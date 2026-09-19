@@ -1,4 +1,4 @@
-import { e2e } from "convoy";
+import { e2e } from "convoy-e2e";
 
 e2e.serial("driver signs in", { platforms: ["ios"], tags: ["smoke"] }, (step) => {
   step("enters credentials", async (t) => {

@@ -1,5 +1,5 @@
 {
-  "name": "convoy",
+  "name": "convoy-e2e",
   "version": "0.1.0",
   "description": "One test. Three platforms. Zero locators — e2e that taps what the user sees.",
   "type": "module",
@@ -38,7 +38,7 @@
     "playwright",
     "jev"
   ],
-  "license": "UNLICENSED",
+  "license": "MIT",
   "dependencies": {
     "commander": "^12.1.0",
     "dotenv": "^16.4.5",
