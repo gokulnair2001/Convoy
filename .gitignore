@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.convoy/
+coverage/
+reports/
+*.log
+.DS_Store

@@ -1,0 +1,15 @@
+name: driver signs in
+platforms: [ios]
+tags: [smoke]
+steps:
+  - type: ${USERNAME}
+    into: Email / Username
+  - tap: Continue
+  - type: ${PASSWORD}
+    into: Password
+  - tap: Log in
+  - which:
+      logged in on another device:
+        - tap: Continue Anyway
+      the home screen: []
+  - see: the home screen

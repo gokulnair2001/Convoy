@@ -1,0 +1,18 @@
+{
+  "emulatePlatform": "ios",
+  "screenWidth": 390,
+  "screenHeight": 844,
+  "initial": "login",
+  "screens": [
+    {
+      "name": "login",
+      "elements": [
+        { "id": "e1", "role": "button", "name": "Back", "enabled": true, "bounds": [0.02, 0.06, 0.12, 0.05] },
+        { "id": "e2", "role": "textfield", "name": "Email", "enabled": true, "bounds": [0.08, 0.28, 0.84, 0.06] },
+        { "id": "e3", "role": "textfield", "name": "Password", "enabled": true, "bounds": [0.08, 0.36, 0.84, 0.06] },
+        { "id": "e4", "role": "button", "name": "Continue", "enabled": true, "bounds": [0.08, 0.50, 0.40, 0.06] },
+        { "id": "e5", "role": "button", "name": "Continue as guest", "enabled": true, "bounds": [0.52, 0.50, 0.40, 0.06] }
+      ]
+    }
+  ]
+}

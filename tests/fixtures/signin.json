@@ -1,0 +1,47 @@
+{
+  "emulatePlatform": "ios",
+  "screenWidth": 390,
+  "screenHeight": 844,
+  "initial": "landing",
+  "screens": [
+    {
+      "name": "landing",
+      "elements": [
+        { "id": "e1", "role": "button", "name": "Back", "enabled": true, "bounds": [0.02, 0.06, 0.12, 0.05] },
+        { "id": "e2", "role": "text", "name": "Example", "enabled": true, "bounds": [0.35, 0.18, 0.30, 0.05] },
+        { "id": "e3", "role": "button", "name": "Sign in", "enabled": true, "bounds": [0.25, 0.72, 0.50, 0.06] },
+        { "id": "e4", "role": "button", "name": "Forgot password?", "enabled": true, "bounds": [0.25, 0.80, 0.50, 0.04] },
+        { "id": "e5", "role": "link", "name": "Create account", "enabled": true, "bounds": [0.25, 0.85, 0.50, 0.04] },
+        { "id": "e6", "role": "button", "name": "Use SSO", "enabled": true, "bounds": [0.25, 0.64, 0.50, 0.06] },
+        { "id": "e7", "role": "tab", "name": "Home", "enabled": true, "bounds": [0.05, 0.93, 0.20, 0.06] },
+        { "id": "e8", "role": "tab", "name": "Settings", "enabled": true, "bounds": [0.75, 0.93, 0.20, 0.06] }
+      ]
+    },
+    {
+      "name": "login",
+      "elements": [
+        { "id": "e1", "role": "button", "name": "Back", "enabled": true, "bounds": [0.02, 0.06, 0.12, 0.05] },
+        { "id": "e2", "role": "textfield", "name": "Email", "value": "", "enabled": true, "bounds": [0.08, 0.28, 0.84, 0.06] },
+        { "id": "e3", "role": "textfield", "name": "Password", "value": "", "enabled": true, "bounds": [0.08, 0.36, 0.84, 0.06] },
+        { "id": "e4", "role": "button", "name": "Continue", "enabled": true, "bounds": [0.25, 0.50, 0.50, 0.06] },
+        { "id": "e5", "role": "button", "name": "Forgot password?", "enabled": true, "bounds": [0.25, 0.58, 0.50, 0.04] },
+        { "id": "e6", "role": "link", "name": "Create account", "enabled": true, "bounds": [0.25, 0.64, 0.50, 0.04] }
+      ]
+    },
+    {
+      "name": "trips",
+      "elements": [
+        { "id": "e1", "role": "text", "name": "Trip list", "enabled": true, "bounds": [0.08, 0.08, 0.50, 0.05] },
+        { "id": "e2", "role": "text", "name": "Today", "enabled": true, "bounds": [0.08, 0.16, 0.30, 0.04] },
+        { "id": "e3", "role": "cell", "name": "Oakland to San Jose", "enabled": true, "bounds": [0.04, 0.22, 0.92, 0.10] },
+        { "id": "e4", "role": "cell", "name": "San Jose to Fresno", "enabled": true, "bounds": [0.04, 0.34, 0.92, 0.10] },
+        { "id": "e5", "role": "tab", "name": "Home", "enabled": true, "bounds": [0.05, 0.93, 0.20, 0.06] },
+        { "id": "e6", "role": "tab", "name": "Settings", "enabled": true, "bounds": [0.75, 0.93, 0.20, 0.06] }
+      ]
+    }
+  ],
+  "transitions": [
+    { "from": "landing", "tapName": "Sign in", "to": "login" },
+    { "from": "login", "tapName": "Continue", "to": "trips" }
+  ]
+}

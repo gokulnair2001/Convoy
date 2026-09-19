@@ -1,0 +1,14 @@
+{
+  "platform": "fixture",
+  "app": {
+    "bundleId": "com.example.app",
+    "package": "com.example.app",
+    "displayName": "Example App"
+  },
+  "fixture": {
+    "path": "tests/fixtures/signin.json",
+    "emulatePlatform": "ios"
+  },
+  "tracesDir": ".convoy/runs",
+  "reset": "relaunch"
+}
