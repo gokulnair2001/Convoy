@@ -1,6 +1,6 @@
 # Convoy
 
-Semantic end-to-end testing for iOS, Android, and web.
+Semantic end-to-end agent testing for iOS, Android, and web.
 
 You describe what should happen in plain language. Convoy dumps the live
 accessibility tree, normalizes it to a platform-agnostic element table, asks

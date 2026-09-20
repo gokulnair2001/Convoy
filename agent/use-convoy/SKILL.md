@@ -5,7 +5,7 @@ description: Helps developers install, configure, run, inspect, and debug Convoy
 
 # Use Convoy
 
-Convoy is semantic e2e for iOS, Android, and web. Authors describe what a human sees. Convoy dumps the accessibility tree, normalizes it, asks Jev which control matches, gates the score, then taps / types / asserts.
+Convoy is semantic end-to-end agent testing for iOS, Android, and web. Authors describe what a human sees. Convoy dumps the accessibility tree, normalizes it, asks Jev which control matches, gates the score, then taps / types / asserts.
 
 No selectors. No element IDs. No explicit waits.
 

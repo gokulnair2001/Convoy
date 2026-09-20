@@ -12,7 +12,7 @@ loadDotenv();
 const { version } = readPackageJson(thisPackageRoot(import.meta.url));
 
 const program = new Command();
-program.name("convoy").description("Semantic end-to-end testing for iOS, Android and web.").version(version);
+program.name("convoy").description("Semantic end-to-end agent testing for iOS, Android, and web.").version(version);
 
 program
   .command("run")
