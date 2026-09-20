@@ -27,6 +27,10 @@ const quiet: DetectDeps = {
   exec: async () => ({ code: 1, stdout: "", stderr: "" }),
 };
 
+function stripAnsi(s: string): string {
+  return s.replace(/\u001b\[[0-9;]*m/g, "");
+}
+
 function captureOutput() {
   const lines: string[] = [];
   const collect = (...args: unknown[]) => {
@@ -35,7 +39,7 @@ function captureOutput() {
   vi.spyOn(console, "log").mockImplementation(collect);
   vi.spyOn(console, "error").mockImplementation(collect);
   return {
-    text: () => lines.join("\n"),
+    text: () => stripAnsi(lines.join("\n")),
   };
 }
 
