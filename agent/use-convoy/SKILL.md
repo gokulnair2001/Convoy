@@ -50,7 +50,7 @@ Two files. Do not mix.
 
 YAML interpolates `${NAME}`. TypeScript reads `process.env.NAME`. Never put UDIDs, DerivedData paths, or credentials in `convoy.config.json`. Do not put a test-suite path in config — tests are files; `convoy run` finds `*.e2e.ts` / `*.e2e.yaml`.
 
-Do not set `ready.see` on `fixture` unless the fixture actually shows that copy.
+Do not set `ready.see` on `fixture` unless the fixture actually shows that copy. `see` matches a control (exact name, then Jev among elements + none), not “this looks like that screen.”
 
 ### `.env` names agents should know
 

@@ -62,6 +62,28 @@ describe("signin fixture flow", () => {
     }
   });
 
+  it("see Log in fails on the email form instead of matching Continue", async () => {
+    const tracesDir = await mkdtemp(path.join(os.tmpdir(), "convoy-"));
+    dirs.push(tracesDir);
+    const config = await loadConfig();
+    config.platform = "fixture";
+    config.jev.mode = "heuristic";
+    config.jev.apiKey = undefined;
+    config.fixture.path = "tests/fixtures/signin.json";
+    config.tracesDir = tracesDir;
+    config.actionTimeoutMs = 80;
+    const session = await createSession(config, "see log in on email form");
+    try {
+      const t = session.steps;
+      await t.resetApp();
+      await t.tap("the sign in button");
+      await expect(t.see("Log in")).rejects.toBeInstanceOf(NotFoundError);
+    } finally {
+      await session.tracer.finish("fail");
+      await session.close();
+    }
+  });
+
   it("surfaces an ambiguous continue as a spec problem", async () => {
     const tracesDir = await mkdtemp(path.join(os.tmpdir(), "convoy-"));
     dirs.push(tracesDir);

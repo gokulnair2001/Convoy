@@ -42,7 +42,11 @@ export function rankedProbabilities(
     .sort((a, b) => b.p - a.p);
 }
 
-export function gateResolve(answers: ResolveAnswers, gates: Gates = DEFAULT_GATES): ResolveDecision {
+export function gateResolve(
+  answers: ResolveAnswers,
+  gates: Gates = DEFAULT_GATES,
+  opts?: { strictTarget?: boolean },
+): ResolveDecision {
   const ranked = rankedProbabilities(answers.target.probabilities);
   const noneP = answers.target.probabilities.none ?? 0;
   const top = ranked[0];
@@ -50,6 +54,25 @@ export function gateResolve(answers: ResolveAnswers, gates: Gates = DEFAULT_GATE
   const gap = top && second ? top.p - second.p : top?.p ?? 0;
   const choiceClear =
     Boolean(top) && top!.id !== "none" && noneP < gates.none && (top!.p >= gates.target || gap >= gates.gap);
+
+  // `see` must name an element above `gates.target`. Do not take a weak winner
+  // just because it beat `none` by `gap` (that is the 0.47 "maybe login" path).
+  if (opts?.strictTarget) {
+    if (!top || top.id === "none" || noneP >= gates.none || top.p < gates.target) {
+      return {
+        outcome: "not_found",
+        reason: formatNotFound(answers.present, noneP, gates),
+      };
+    }
+    if (second && second.id !== "none" && gap < gates.gap) {
+      return {
+        outcome: "ambiguous",
+        reason: "top-two probabilities are too close to pick a single control",
+        top: ranked.slice(0, 3),
+      };
+    }
+    return { outcome: "pass", elementId: top.id };
+  }
 
   // Live Jev often scores present ~0.7 while Choice is already sure (e.g. e3 0.99, none 0.01).
   // Trust the Choice when it is clear; only require the noul when Choice is not.

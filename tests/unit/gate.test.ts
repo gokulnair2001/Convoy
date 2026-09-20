@@ -71,6 +71,36 @@ describe("gateResolve", () => {
     });
     expect(decision).toEqual({ outcome: "pass", elementId: "e2" });
   });
+
+  it("see drops a weak winner instead of taking the best of a bad lot", () => {
+    const decision = gateResolve(
+      {
+        present: 1,
+        target: {
+          choice: "e2",
+          probabilities: { e2: 0.47, e4: 0.08, none: 0.08 },
+        },
+      },
+      DEFAULT_GATES,
+      { strictTarget: true },
+    );
+    expect(decision.outcome).toBe("not_found");
+  });
+
+  it("see still passes a clear element above the target gate", () => {
+    const decision = gateResolve(
+      {
+        present: 1,
+        target: {
+          choice: "e4",
+          probabilities: { e4: 0.88, e2: 0.05, none: 0.04 },
+        },
+      },
+      DEFAULT_GATES,
+      { strictTarget: true },
+    );
+    expect(decision).toEqual({ outcome: "pass", elementId: "e4" });
+  });
 });
 
 describe("gateWhich", () => {
