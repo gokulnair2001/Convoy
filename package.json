@@ -1,7 +1,7 @@
 {
   "name": "convoy-e2e",
   "version": "0.1.2",
-  "description": "One test. Three platforms. Zero locators — e2e that taps what the user sees.",
+  "description": "Semantic end-to-end agent testing for iOS, Android, and web.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

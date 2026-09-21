@@ -1,6 +1,6 @@
 # Convoy
 
-Semantic end-to-end testing for iOS, Android, and web.
+Semantic end-to-end agent testing for iOS, Android, and web.
 
 You describe what should happen in plain language. Convoy dumps the live
 accessibility tree, normalizes it to a platform-agnostic element table, asks
@@ -373,12 +373,12 @@ steps:                         # required, non-empty
 |---|---|
 | `tap: <intent>` | Resolve the control and tap it |
 | `type: <text>` + `into: <intent>` | Resolve the field and type. `${ENV}` on `type` must be set or the step fails |
-| `see: <intent>` | Assert the screen / copy is present |
+| `see: <intent>` | Assert a control matching the phrase is present (exact name, then Jev Choice + none) |
 | `see.not` / `seeNot` / `see_not` / `not: { see: … }` | Assert it is absent |
 | `back: true` | Platform back |
 | `which: { intent: [steps], … }` | Wait until one of ≥2 screens is present, then run that branch |
 
-Phrase intents like a human: `"continue"`, `"the home screen"`. A unique on-screen name still wins; if that name is missing, tap may resolve the unique forward CTA (continue / next / log in). If Jev returns **ambiguous**, disambiguate the phrase (`inspect` shows the labels it can see).
+Phrase intents like a human: `"continue"`, `"the email field"`. A unique on-screen name still wins. If that name is missing, **tap** may resolve the unique forward CTA (continue / next / log in); **see** will not — it picks an element or none, and scores below the gate are a miss. Use `which` for “which page is this.” If Jev returns **ambiguous**, disambiguate the phrase (`inspect` shows the labels it can see).
 
 `${NAME}` on `type` is expanded when the step runs. Listing or parsing tests does not require those secrets to be set. If a token is still unset at run time, Convoy tells you to add it to `.env`.
 

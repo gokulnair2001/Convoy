@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_GATES } from "../../src/core/gate.js";
 import { AmbiguousError, NotFoundError } from "../../src/core/errors.js";
-import { textFieldForTyping, type Element } from "../../src/core/element.js";
+import { elementsWithExactName, textFieldForTyping, type Element } from "../../src/core/element.js";
 import { HeuristicJevClient } from "../../src/jev/client.js";
 import { Resolver } from "../../src/jev/resolver.js";
 import type { JevClient, JevRequest, JevResponse } from "../../src/jev/types.js";
@@ -213,5 +213,100 @@ describe("textFieldForTyping", () => {
     field.bounds = [0.1, 0.5, 0.8, 0.06];
     field.value = "old@example.com";
     expect(textFieldForTyping([label, field], label)).toEqual(field);
+  });
+});
+
+describe("see resolve", () => {
+  const emailForm: Element[] = [
+    el("e1", "textfield", "text field"),
+    el("e2", "button", "Continue"),
+    el("e3", "text", "Motive Driver"),
+    el("e4", "text", "Email / Username"),
+  ];
+
+  it("passes on an exact visible name without calling Jev", async () => {
+    let calls = 0;
+    const jev: JevClient = {
+      async systemOne() {
+        calls += 1;
+        throw new Error("exact match must not call Jev");
+      },
+    };
+    const resolver = new Resolver(jev, DEFAULT_GATES, "iOS · app");
+    const hit = await resolver.resolve("log in", [el("e5", "button", "Log in"), ...emailForm], `see "log in"`);
+    expect(calls).toBe(0);
+    expect(hit.element.name).toBe("Log in");
+    expect(hit.target).toBe(1);
+  });
+
+  it("throws ambiguous when two controls share the visible name", async () => {
+    const resolver = new Resolver(new HeuristicJevClient(), DEFAULT_GATES, "iOS · app");
+    const screen = [el("e1", "button", "OK"), el("e2", "button", "OK")];
+    await expect(resolver.resolve("OK", screen, `see "OK"`)).rejects.toBeInstanceOf(AmbiguousError);
+  });
+
+  it("does not treat Continue as Log in on the email form", async () => {
+    const resolver = new Resolver(new HeuristicJevClient(), DEFAULT_GATES, "iOS · app");
+    await expect(resolver.resolve("Log in", emailForm, `see "Log in"`)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("does not apply tap forward-CTA synonyms when seeing", async () => {
+    const resolver = new Resolver(new HeuristicJevClient(), DEFAULT_GATES, "iOS · app");
+    await expect(resolver.resolve("continue", login, `see "continue"`)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("picks a paraphrased label via Choice when no exact name exists", async () => {
+    const jev: JevClient = {
+      async systemOne(request) {
+        expect(request.questions.present).toBeUndefined();
+        expect(request.questions.target?.type).toBe("choice");
+        expect(request.questions.target?.instructions).toMatch(/Action: see/);
+        expect(request.questions.target?.instructions).not.toMatch(/primary forward CTA/);
+        return {
+          answers: {
+            target: {
+              type: "choice",
+              choice: "e4",
+              probabilities: { e4: 0.91, e2: 0.04, none: 0.03 },
+            },
+          },
+        };
+      },
+    };
+    const resolver = new Resolver(jev, DEFAULT_GATES, "iOS · app");
+    const hit = await resolver.resolve("the email field", emailForm, `see "the email field"`);
+    expect(hit.element.name).toBe("Email / Username");
+  });
+
+  it("drops a 0.47 winner instead of calling the screen a match", async () => {
+    const jev: JevClient = {
+      async systemOne() {
+        return {
+          answers: {
+            target: {
+              type: "choice",
+              choice: "e2",
+              probabilities: { e2: 0.47, e4: 0.08, none: 0.08 },
+            },
+          },
+        };
+      },
+    };
+    const resolver = new Resolver(jev, DEFAULT_GATES, "iOS · app");
+    await expect(resolver.resolve("Log in", emailForm, `see "Log in"`)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("heuristic see finds Trip list for the trip list screen", async () => {
+    const trips: Element[] = [el("e1", "text", "Trip list"), el("e2", "cell", "Oakland to San Jose")];
+    const resolver = new Resolver(new HeuristicJevClient(), DEFAULT_GATES, "iOS · app");
+    const hit = await resolver.resolve("the trip list screen", trips, `see "the trip list screen"`);
+    expect(hit.element.name).toBe("Trip list");
+  });
+});
+
+describe("elementsWithExactName", () => {
+  it("folds case and punctuation", () => {
+    const screen = [el("e1", "button", "Log in"), el("e2", "button", "Continue")];
+    expect(elementsWithExactName(screen, "log-in").map((e) => e.id)).toEqual(["e1"]);
   });
 });

@@ -1,4 +1,4 @@
-import { type Element } from "../core/element.js";
+import { elementsWithExactName, type Element } from "../core/element.js";
 import { NotFoundError } from "../core/errors.js";
 import { screenRows } from "../core/failure.js";
 import { gateResolve, throwResolve, type Gates } from "../core/gate.js";
@@ -23,32 +23,61 @@ export class Resolver {
   ) {}
 
   async resolve(intent: string, elements: Element[], step: string, traceDir?: string): Promise<ResolveHit> {
+    const action = actionFromStep(step);
+    if (action === "see") {
+      const exact = elementsWithExactName(elements, intent);
+      if (exact.length === 1) {
+        return exactHit(exact[0]!, intent, elements, action, this.screenLabel);
+      }
+      if (exact.length > 1) {
+        throwResolve(
+          {
+            outcome: "ambiguous",
+            reason: "two or more controls have this visible name",
+            top: exact.map((el) => ({ id: el.id, p: 1 })),
+          },
+          elements,
+          `"${intent}"`,
+          step,
+          traceDir,
+        );
+      }
+    }
+
     const criteria: Record<string, string | null> = {};
     for (const el of elements) {
       criteria[el.id] = `${el.role} "${el.name}"${el.value ? ` value=${JSON.stringify(el.value)}` : ""}`;
     }
     criteria.none = "No unique control fulfills the intent";
-    const action = actionFromStep(step);
 
     const request: JevRequest = {
-      state: buildJevState(this.screenLabel, elements, { includeValues: true }),
-      questions: {
-        present: {
-          type: "noul",
-          instructions: resolveInstructions("present", action, intent),
-        },
-        target: {
-          type: "choice",
-          instructions: resolveInstructions("target", action, intent),
-          criteria,
-        },
-      },
+      state: buildJevState(this.screenLabel, elements, { includeValues: action !== "see" }),
+      questions:
+        action === "see"
+          ? {
+              target: {
+                type: "choice",
+                instructions: resolveInstructions("target", action, intent),
+                criteria,
+              },
+            }
+          : {
+              present: {
+                type: "noul",
+                instructions: resolveInstructions("present", action, intent),
+              },
+              target: {
+                type: "choice",
+                instructions: resolveInstructions("target", action, intent),
+                criteria,
+              },
+            },
     };
 
     const response = await this.jev.systemOne(request);
-    const present = noulValue(response.answers.present);
     const target = asChoice(response.answers.target);
-    const decision = gateResolve({ present, target }, this.gates);
+    const present = action === "see" ? 1 : noulValue(response.answers.present);
+    const decision = gateResolve({ present, target }, this.gates, action === "see" ? { strictTarget: true } : undefined);
 
     if (decision.outcome !== "pass") {
       throwResolve(decision, elements, `"${intent}"`, step, traceDir);
@@ -82,10 +111,12 @@ export class Resolver {
   }
 }
 
-export type ResolveAction = "tap" | "type";
+export type ResolveAction = "tap" | "type" | "see";
 
 export function actionFromStep(step: string): ResolveAction {
-  return /^\s*type\b/i.test(step) ? "type" : "tap";
+  if (/^\s*type\b/i.test(step)) return "type";
+  if (/^\s*see\b/i.test(step)) return "see";
+  return "tap";
 }
 
 /** Shared footer so the heuristic client can parse action + phrase. */
@@ -93,10 +124,56 @@ export function resolveInstructions(kind: "present" | "target", action: ResolveA
   const rules =
     action === "tap"
       ? "The author's phrase is an intent; the visible label may differ. If one control's visible name matches the phrase (ignore case and punctuation), pick that control. If none match, the unique primary forward CTA (continue, next, submit, log in, sign in, done, save) may match even when the label differs. Side actions (Forgot password, Continue as guest, Use SSO, Create account) only match when the phrase names them. If two controls fit equally, pick none."
-      : "The author's phrase is an intent; the visible label may differ. If one field's visible name matches the phrase (ignore case and punctuation), pick that field. Prefer text fields. If two fields fit equally, pick none.";
+      : action === "see"
+        ? "The author's phrase is an intent; the visible label may differ. If one control's visible name matches the phrase (ignore case and punctuation), pick that control. Otherwise pick the unique control whose name means the same thing. Do not infer from the kind of screen. Do not pick a unique forward CTA (continue, next, log in) unless the phrase names that action or that label. If two controls fit equally, or none do, pick none."
+        : "The author's phrase is an intent; the visible label may differ. If one field's visible name matches the phrase (ignore case and punctuation), pick that field. Prefer text fields. If two fields fit equally, pick none.";
   const ask =
     kind === "present"
       ? `Does \`elements\` contain a unique ${action === "type" ? "field" : "control"} that fulfills this ${action}?`
-      : `Which ${action === "type" ? "field" : "control"} in \`elements\` should be used to ${action}?`;
+      : action === "see"
+        ? "Which control in `elements` is this intent pointing at? Pick none if it is not on screen."
+        : `Which ${action === "type" ? "field" : "control"} in \`elements\` should be used to ${action}?`;
   return `${ask} ${rules}\nAction: ${action}\nIntent: ${intent}`;
+}
+
+function exactHit(
+  element: Element,
+  intent: string,
+  elements: Element[],
+  action: ResolveAction,
+  screenLabel: string,
+): ResolveHit {
+  const criteria: Record<string, string | null> = {};
+  for (const el of elements) {
+    criteria[el.id] = `${el.role} "${el.name}"`;
+  }
+  criteria.none = "No unique control fulfills the intent";
+  const request: JevRequest = {
+    state: buildJevState(screenLabel, elements, { includeValues: action !== "see" }),
+    questions: {
+      target: {
+        type: "choice",
+        instructions: `Exact visible name match.\nAction: ${action}\nIntent: ${intent}`,
+        criteria,
+      },
+    },
+  };
+  const response: JevResponse = {
+    answers: {
+      target: {
+        type: "choice",
+        choice: element.id,
+        probabilities: { [element.id]: 1, none: 0 },
+        confidence: 1,
+      },
+    },
+  };
+  return {
+    element,
+    present: 1,
+    target: 1,
+    none: 0,
+    request,
+    response,
+  };
 }

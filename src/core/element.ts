@@ -89,3 +89,15 @@ export function jevElement(el: Element): {
     ...(el.value !== undefined ? { value: el.value } : {}),
   };
 }
+
+/** Case, punctuation, and spacing folded so "Log in" equals "log-in". */
+export function normalizeLabel(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** Controls whose visible name equals the phrase after {@link normalizeLabel}. */
+export function elementsWithExactName(elements: Element[], intent: string): Element[] {
+  const key = normalizeLabel(intent);
+  if (!key) return [];
+  return elements.filter((el) => normalizeLabel(el.name) === key);
+}

@@ -1,5 +1,5 @@
 import type { Driver } from "../core/driver.js";
-import { textFieldForTyping, type Element, type LogicalPlatform } from "../core/element.js";
+import { formatElement, textFieldForTyping, type Element, type LogicalPlatform } from "../core/element.js";
 import { AmbiguousError, AssertionFailedError, ConvoyError, NotFoundError, enrichFailure } from "../core/errors.js";
 import { formatFailure, rankedScores, screenRows, type FailureReport } from "../core/failure.js";
 import { gateWhich, type Gates } from "../core/gate.js";
@@ -222,81 +222,81 @@ export class Steps {
   }
 
   async flush(): Promise<void> {
-    // reserved for batched see() — currently each see() is its own request,
-    // and seeAll() batches explicitly.
+    // reserved for batched see() — each see() is its own resolve
   }
 
   async seeAll(intents: Array<string | { not: string }>): Promise<void> {
     await this.beforeAction();
-    const started = Date.now();
-    this.ctx.reporter.settling();
-    const elements = await waitForSettle(() => this.ctx.driver.snapshot(), {
-      timeoutMs: this.ctx.actionTimeoutMs,
-    });
-    const assertions = intents.map((item) =>
-      typeof item === "string"
-        ? { intent: item, kind: "see" as const }
-        : { intent: item.not, kind: "see.not" as const },
-    );
-    const result = await this.ctx.oracle.ask(assertions, elements, "see", this.ctx.tracer.dir);
-    await this.ctx.tracer.recordStep({
-      action: "see",
-      outcome: "pass",
-      ms: Date.now() - started,
-      elements,
-      request: result.request,
-      response: result.response,
-      screenshot: await this.ctx.driver.screenshot(),
-    });
-    for (const hit of result.hits) {
-      this.ctx.reporter.see(hit.assertion.intent, hit.probability, hit.assertion.kind === "see.not");
+    for (const item of intents) {
+      if (typeof item === "string") await this.recordSee(item);
+      else await this.recordSeeNot(item.not);
     }
   }
 
   private async seeYes(intent: string): Promise<void> {
-    await this.assertSee(intent, false);
+    await this.beforeAction();
+    await this.recordSee(intent);
   }
 
   private async seeNot(intent: string): Promise<void> {
-    await this.assertSee(intent, true);
+    await this.beforeAction();
+    await this.recordSeeNot(intent);
   }
 
-  private async assertSee(intent: string, negated: boolean): Promise<void> {
-    await this.beforeAction();
+  /** Exact name, then Choice among elements + none. Retries while not found. */
+  private async recordSee(intent: string): Promise<void> {
+    const started = Date.now();
+    const { elements, hit } = await this.resolveWhenPresent(intent, `see "${intent}"`);
+    await this.ctx.tracer.recordStep({
+      action: "see",
+      intent,
+      outcome: "pass",
+      ms: Date.now() - started,
+      elements,
+      request: hit.request,
+      response: hit.response,
+      screenshot: await this.ctx.driver.screenshot(),
+      element: { id: hit.element.id, name: hit.element.name },
+      probability: hit.target,
+    });
+    this.ctx.reporter.see(intent, hit.target, false);
+  }
+
+  /** Fail if a control matches; pass if resolve says none. Does not wait for it to vanish. */
+  private async recordSeeNot(intent: string): Promise<void> {
     const started = Date.now();
     this.ctx.reporter.settling();
-    const kind = negated ? ("see.not" as const) : ("see" as const);
-    let lastElements: Element[] = [];
+    const elements = await this.ctx.driver.snapshot();
     try {
-      const result = await waitUntil(
-        async () => {
-          const elements = await this.ctx.driver.snapshot();
-          lastElements = elements;
-          return {
-            elements,
-            result: await this.ctx.oracle.ask([{ intent, kind }], elements, `${kind} "${intent}"`, this.ctx.tracer.dir),
-          };
-        },
-        (err) => !negated && err instanceof AssertionFailedError,
-        { timeoutMs: this.ctx.actionTimeoutMs, intervalMs: 750 },
-      );
-      const hit = result.result.hits[0]!;
-      await this.ctx.tracer.recordStep({
-        action: kind,
+      const hit = await this.ctx.resolver.resolve(intent, elements, `see.not "${intent}"`, this.ctx.tracer.dir);
+      throw new AssertionFailedError({
+        kind: "assert_failed",
+        title: `saw ${JSON.stringify(intent)} but the test expected it gone`,
+        action: "see.not",
         intent,
-        outcome: hit.outcome,
-        ms: Date.now() - started,
-        elements: result.elements,
-        request: result.result.request,
-        response: result.result.response,
-        screenshot: await this.ctx.driver.screenshot(),
-        probability: hit.probability,
+        scores: [{ label: formatElement(hit.element), p: hit.target }],
+        screen: screenRows(elements),
+        hint: "that content is on screen — if it is a toast, wait longer or assert after it dismisses",
+        next: ["convoy inspect"],
+        traceDir: this.ctx.tracer.dir,
       });
-      this.ctx.reporter.see(intent, hit.probability, negated);
     } catch (err) {
+      if (err instanceof NotFoundError) {
+        await this.ctx.tracer.recordStep({
+          action: "see.not",
+          intent,
+          outcome: "pass",
+          ms: Date.now() - started,
+          elements,
+          screenshot: await this.ctx.driver.screenshot(),
+          probability: 0,
+        });
+        this.ctx.reporter.see(intent, 0, true);
+        return;
+      }
       throw enrichFailure(err, {
         waitedMs: Date.now() - started,
-        screen: screenRows(lastElements),
+        screen: screenRows(elements),
         traceDir: this.ctx.tracer.dir,
       });
     }
