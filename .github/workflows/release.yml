@@ -28,32 +28,65 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Do not set registry-url. setup-node would write
+      # //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN} and, with no
+      # token, a placeholder that blocks OIDC trusted publishing (npm E404).
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-          registry-url: https://registry.npmjs.org
 
-      - name: Use npm 11 (OIDC trusted publishing)
-        run: npm install -g npm@11
+      - name: Use npm 11.5.1+ (OIDC trusted publishing)
+        run: npm install -g 'npm@^11.5.1'
 
       - run: npm ci
       - run: npm test
       - run: npm run typecheck
+      - run: npm run build
 
       - name: Bump version, tag, and push
         id: bump
         env:
           BUMP: ${{ github.event.inputs.bump || 'patch' }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          TAG=$(npm version "$BUMP" -m "chore: release %s [skip ci]")
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          git push origin HEAD --follow-tags
+          CURRENT=$(node -p "require('./package.json').version")
+          ON_NPM=0
+          if npm view "convoy-e2e@${CURRENT}" version >/dev/null 2>&1; then
+            ON_NPM=1
+          fi
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ "$ON_NPM" = "1" ]; then
+            TAG=$(npm version "$BUMP" -m "chore: release %s [skip ci]")
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            git push origin HEAD --follow-tags
+          else
+            TAG="v${CURRENT}"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "${TAG} is not on npm yet; publishing it without bumping."
+            if ! git rev-parse -q --verify "refs/tags/${TAG}"; then
+              git tag -a "$TAG" -m "chore: release ${CURRENT} [skip ci]"
+              git push origin "$TAG"
+            fi
+          fi
 
-      - run: npm publish --access public
+      - name: Publish to npm
+        run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN || true
+          if [ -n "${NPM_CONFIG_USERCONFIG:-}" ] && [ -f "$NPM_CONFIG_USERCONFIG" ]; then
+            sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
+          fi
+          npm publish --access public
 
       - name: GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${{ steps.bump.outputs.tag }}" --generate-notes --title "${{ steps.bump.outputs.tag }}"
+        run: |
+          TAG="${{ steps.bump.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub Release ${TAG} already exists."
+          else
+            gh release create "$TAG" --generate-notes --title "$TAG"
+          fi
