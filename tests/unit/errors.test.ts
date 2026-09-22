@@ -36,9 +36,13 @@ describe("failure reporting", () => {
       expect(message).toContain("0.48");
       expect(message).toContain("0.44");
       expect(message).toContain("rephrase so only one control matches");
+      expect(message).toContain("  next\n    rephrase so only one control matches");
       expect(message).toContain("convoy inspect");
       expect(message).toContain("traces    .convoy/runs/2026-09-19T14-22-01");
+      expect(message).toContain("█");
+      expect(message).toMatch(/\[4] "Continue"\s+←/);
       expect(message).not.toMatch(/AMBIGUOUS|noul|disambiguate/);
+      expect(Object.keys(err as object)).not.toContain("report");
     }
   });
 
@@ -56,8 +60,10 @@ describe("failure reporting", () => {
       expect(err).toBeInstanceOf(NotFoundError);
       const message = (err as Error).message;
       expect(message).toContain('could not tap "the invoice button"');
-      expect(message).toContain("present 0.08");
-      expect(message).toContain("none 0.90");
+      expect(message).toContain("present");
+      expect(message).toContain("0.08");
+      expect(message).toContain("none");
+      expect(message).toContain("0.90");
       expect(message).toContain('[4] "Continue"');
       expect(message).toContain("not on this screen");
       expect(message).toContain("traces    .convoy/runs/demo");

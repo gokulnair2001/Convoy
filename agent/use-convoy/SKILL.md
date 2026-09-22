@@ -56,7 +56,7 @@ Do not set `ready.see` on `fixture` unless the fixture actually shows that copy.
 
 | Variable | Purpose |
 |---|---|
-| `TYPESAFE_API_KEY` | Live Jev. Empty → heuristic (offline stand-in, not Jev) |
+| `TYPESAFE_API_KEY` | Live Jev. Empty → heuristic (offline stand-in, not Jev). `convoy run` on ios/android/web warns; fixture does not. |
 | `TYPESAFE_BASE_URL` | Default US `https://api.typesafe.ai/v1`; set EU if needed |
 | `CONVOY_PLATFORM` | `fixture` \| `ios` \| `android` \| `web` |
 | `CONVOY_IOS_UDID` / `CONVOY_IOS_BUNDLE_ID` / `CONVOY_IOS_APP` | Simulator + `.app` path |

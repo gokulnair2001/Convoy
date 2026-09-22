@@ -198,7 +198,7 @@ describe("signin fixture flow", () => {
         expect(message).toMatch(/none of these screens appeared/);
         expect(message).toMatch(/on screen/);
         expect(message).toMatch(/Sign in/);
-        expect(message).toMatch(/none 0\.90/);
+        expect(message).toMatch(/none\s+[█░]+\s+0\.90/);
         expect(message).toMatch(/waited/);
         expect(message).not.toMatch(/NOT FOUND|last screen:|last pick:/);
         return true;

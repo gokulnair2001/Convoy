@@ -37,7 +37,8 @@ export class Reporter implements LifecycleLogger {
       this.out(platformLine);
       return;
     }
-    this.out(`${pc.bold("Convoy")}  ${info.version}`);
+    for (const line of wordmark(info.version)) this.out(line);
+    this.out("");
     this.out(platformLine);
     this.out(`  ${padLabel("app")} ${redactValue("app", info.app)}`);
     this.out(`  ${padLabel("jev")} ${redactValue("jev", info.jev)}`);
@@ -151,6 +152,21 @@ function padLabel(label: string): string {
   return label.padEnd(10);
 }
 
+/** Compact lockup: wordmark + title. Skipped in silent/headless. */
+export function wordmark(version: string): string[] {
+  const art = [
+    String.raw`   ______`,
+    String.raw`  / ____/___  ____ _   ______  __`,
+    String.raw` / /   / __ \/ __ \ | / / __ \/ /`,
+    String.raw`/ /___/ /_/ / / / / |/ / /_/ / /`,
+    String.raw`\____/\____/_/ /_/|___/\____/_/`,
+  ];
+  return [
+    ...art.map((line) => pc.cyan(line)),
+    `  ${pc.bold("CONVOY")}  ${pc.dim(`semantic e2e · ${version}`)}`,
+  ];
+}
+
 function colorFailureLine(line: string): string {
   if (!line) return line;
   const labeled = /^( {2})(waited|scores|next|traces|detail|on screen)(\s*)(.*)$/.exec(line);
@@ -158,7 +174,9 @@ function colorFailureLine(line: string): string {
     const [, indent, label, spaces, rest] = labeled;
     return `${indent}${pc.dim(label)}${spaces}${rest}`;
   }
+  if (/█|░/.test(line)) return pc.yellow(line);
+  if (line.includes("  ←")) return pc.yellow(line);
   if (/^ {4}/.test(line)) return pc.dim(line);
-  if (!/^\s/.test(line)) return pc.red(line);
+  if (!/^\s/.test(line)) return pc.red(pc.bold(line));
   return line;
 }

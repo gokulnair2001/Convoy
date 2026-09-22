@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bannerFromConfig } from "../../src/cli/run.js";
+import { bannerFromConfig, heuristicFallbackWarning } from "../../src/cli/run.js";
 import { applyEnv, defaultConfig } from "../../src/core/config.js";
 import { Reporter, type RunBanner } from "../../src/runner/reporter.js";
 
@@ -39,7 +39,9 @@ describe("reporter", () => {
       jev: "live · jev-latest · debug",
     });
     const out = text();
-    expect(out).toMatch(/Convoy\s+0\.1\.0/);
+    expect(out).toContain("CONVOY");
+    expect(out).toContain("semantic e2e · 0.1.0");
+    expect(out).toContain("/ ____/___");
     expect(out).toMatch(/platform\s+ios · iPhone \(UDID-1\)/);
     expect(out).toContain("Example App  com.example.app");
     expect(out).toContain("live · jev-latest · debug");
@@ -68,7 +70,9 @@ describe("reporter", () => {
     reporter.banner(banner);
     const out = text();
     expect(out).toMatch(/platform\s+ios · iPhone \(UDID-1\)/);
-    expect(out).not.toContain("Convoy");
+    expect(out).not.toContain("CONVOY");
+    expect(out).not.toContain("semantic e2e");
+    expect(out).not.toContain("/ ____/");
     expect(out).not.toContain("Example App");
     expect(out).not.toContain("jev");
   });
@@ -146,5 +150,30 @@ describe("reporter", () => {
     reporter.beginTest("signs in with email");
     const out = text();
     expect(out.startsWith("\nsigns in with email")).toBe(true);
+  });
+
+  it("warns when a device run has no API key and is on heuristic", () => {
+    const ios = applyEnv(defaultConfig(), { CONVOY_PLATFORM: "ios" });
+    expect(ios.jev.mode).toBe("heuristic");
+    expect(heuristicFallbackWarning(ios)).toMatch(/TYPESAFE_API_KEY is not set/);
+
+    const withKey = applyEnv(defaultConfig(), {
+      CONVOY_PLATFORM: "ios",
+      TYPESAFE_API_KEY: "sk-live-test",
+    });
+    expect(heuristicFallbackWarning(withKey)).toBeUndefined();
+
+    const fixture = defaultConfig();
+    expect(fixture.platform).toBe("fixture");
+    expect(heuristicFallbackWarning(fixture)).toBeUndefined();
+  });
+
+  it("does not warn when heuristic is explicit but a key is present", () => {
+    const config = applyEnv(defaultConfig(), {
+      CONVOY_PLATFORM: "android",
+      TYPESAFE_API_KEY: "sk-live-test",
+      CONVOY_JEV_MODE: "heuristic",
+    });
+    expect(heuristicFallbackWarning(config)).toBeUndefined();
   });
 });
