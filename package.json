@@ -1,6 +1,6 @@
 {
   "name": "convoy-e2e",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Semantic end-to-end agent testing for iOS, Android, and web.",
   "type": "module",
   "main": "./dist/index.js",
