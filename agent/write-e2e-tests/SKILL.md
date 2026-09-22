@@ -50,6 +50,7 @@ Do **not** invent waits, sleeps, locators, `getByRole`, `testId`, or `waitForSel
 - If a control with that name is on screen, that control wins (`tap: continue` → **Continue**, not **Log in**). Name **log in** when that is the button you want.
 - `inspect` is for disambiguation, not a required vocabulary. Bad: `"button[0]"`, `"#login"`, `"com.example:id/continue"`, `"the blue button in the nav"`.
 - If the gate returns **ambiguous**, tighten the phrase to the inspect label. If **not found**, the control is missing, unlabelled, or still loading — do not add a wait.
+- `type` is not ambiguous when a heading and the field share a name (`Username` label + `Username` field). Convoy types into the field. Two fields with that name still fail.
 - `see` checks for a control, not a screen vibe. An exact visible name wins; otherwise Jev picks among elements or **none**. `see: Log in` fails if that label is absent, even on a login form. Use `which` when the question is which page you are on.
 
 ## YAML shape

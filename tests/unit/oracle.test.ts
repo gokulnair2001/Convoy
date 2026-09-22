@@ -67,7 +67,8 @@ describe("Oracle", () => {
         expect(err).toBeInstanceOf(AssertionFailedError);
         const message = (err as Error).message;
         expect(message).toContain('did not see "the trip list screen"');
-        expect(message).toContain("yes 0.05");
+        expect(message).toContain("yes");
+        expect(message).toContain("0.05");
         expect(message).toContain("Trip list");
         expect(message).not.toMatch(/noul|FAILED  see/);
         return true;

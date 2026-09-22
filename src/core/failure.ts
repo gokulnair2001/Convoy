@@ -56,11 +56,18 @@ export function formatFailure(report: FailureReport): string {
     lines.push(`  waited    ${formatDuration(report.waitedMs)}`);
   }
   if (report.scores?.length) {
-    lines.push(`  scores    ${formatScores(report.scores)}`);
+    lines.push("  scores");
+    const width = scoreLabelWidth(report.scores);
+    for (const score of report.scores) {
+      lines.push(`    ${score.label.padEnd(width)}  ${scoreBar(score.p)}  ${score.p.toFixed(2)}`);
+    }
   }
   if (report.screen?.length) {
     lines.push("  on screen");
-    for (const row of report.screen) lines.push(`    ${row}`);
+    const marked = new Set(report.scores?.map((s) => s.label) ?? []);
+    for (const row of report.screen) {
+      lines.push(marked.has(row) ? `    ${row}  ←` : `    ${row}`);
+    }
   }
   if (report.detail?.trim()) {
     lines.push("  detail");
@@ -68,11 +75,20 @@ export function formatFailure(report: FailureReport): string {
   }
   const next = [report.hint, ...(report.next ?? [])].filter((line) => line.trim().length > 0);
   if (next.length > 0) {
-    lines.push(`  next      ${next[0]}`);
-    for (const extra of next.slice(1)) lines.push(`            ${extra}`);
+    lines.push("  next");
+    for (const step of next) lines.push(`    ${step}`);
   }
   if (report.traceDir) lines.push(`  traces    ${report.traceDir}`);
   return lines.join("\n").replace(/\n+$/u, "");
+}
+
+function scoreLabelWidth(scores: FailureScore[]): number {
+  return Math.min(36, Math.max(...scores.map((s) => s.label.length), 8));
+}
+
+function scoreBar(p: number, width = 10): string {
+  const filled = Math.round(Math.min(1, Math.max(0, p)) * width);
+  return `${"█".repeat(filled)}${"░".repeat(width - filled)}`;
 }
 
 export function mergeReport(base: FailureReport, extra: Partial<FailureReport>): FailureReport {

@@ -5,18 +5,21 @@ export type GateOutcome = "pass" | "ambiguous" | "not_found" | "assert_failed";
 export type ConvoyOutcome = GateOutcome | "timeout" | "driver" | "jev" | "config";
 
 export class ConvoyError extends Error {
-  readonly outcome: ConvoyOutcome;
-  readonly report: FailureReport;
-  readonly traceDir?: string;
-  readonly step?: string;
+  declare readonly outcome: ConvoyOutcome;
+  declare readonly report: FailureReport;
+  declare readonly traceDir?: string;
+  declare readonly step?: string;
 
   constructor(report: FailureReport, outcome?: ConvoyOutcome) {
     super(formatFailure(report));
     this.name = "ConvoyError";
-    this.report = report;
-    this.outcome = outcome ?? kindToOutcome(report.kind);
-    this.traceDir = report.traceDir;
-    this.step = report.action;
+    const resolved = outcome ?? kindToOutcome(report.kind);
+    Object.defineProperties(this, {
+      report: { value: report, enumerable: false },
+      outcome: { value: resolved, enumerable: false },
+      traceDir: { value: report.traceDir, enumerable: false },
+      step: { value: report.action, enumerable: false },
+    });
   }
 }
 

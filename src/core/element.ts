@@ -70,6 +70,34 @@ export function textFieldForTyping(elements: Element[], resolved: Element): Elem
   return [...fields].sort((a, b) => dist(a, rx, ry) - dist(b, rx, ry))[0]!;
 }
 
+/**
+ * Classic SwiftUI/Android form: a static heading and the field both publish
+ * the same accessibility name ("Username"). For type-into, that pair is one
+ * target — the field — not an ambiguous choice.
+ *
+ * Returns the unique text field in a same-name cluster. Two fields that share
+ * a name, or two clusters each with a field, stay unresolved.
+ */
+export function uniqueFieldForTyping(candidates: Element[]): Element | undefined {
+  const enabled = candidates.filter((e) => e.enabled !== false);
+  if (enabled.length === 0) return undefined;
+
+  const groups = new Map<string, Element[]>();
+  for (const el of enabled) {
+    const key = normalizeLabel(el.name);
+    if (!key) continue;
+    const group = groups.get(key);
+    if (group) group.push(el);
+    else groups.set(key, [el]);
+  }
+
+  const unique = [...groups.values()].filter((group) => {
+    return group.filter((e) => e.role === "textfield").length === 1;
+  });
+  if (unique.length !== 1) return undefined;
+  return unique[0]!.find((e) => e.role === "textfield");
+}
+
 function dist(el: Element, x: number, y: number): number {
   const cx = el.bounds[0] + el.bounds[2] / 2;
   const cy = el.bounds[1] + el.bounds[3] / 2;

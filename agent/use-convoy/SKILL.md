@@ -56,7 +56,7 @@ Do not set `ready.see` on `fixture` unless the fixture actually shows that copy.
 
 | Variable | Purpose |
 |---|---|
-| `TYPESAFE_API_KEY` | Live Jev. Empty → heuristic (offline stand-in, not Jev) |
+| `TYPESAFE_API_KEY` | Live Jev. Empty → heuristic (offline stand-in, not Jev). `convoy run` on ios/android/web warns; fixture does not. |
 | `TYPESAFE_BASE_URL` | Default US `https://api.typesafe.ai/v1`; set EU if needed |
 | `CONVOY_PLATFORM` | `fixture` \| `ios` \| `android` \| `web` |
 | `CONVOY_IOS_UDID` / `CONVOY_IOS_BUNDLE_ID` / `CONVOY_IOS_APP` | Simulator + `.app` path |
@@ -107,7 +107,7 @@ Convoy will boot the iOS simulator, install, and launch. It will **not** start a
 
 | Gate | Meaning | Fix |
 |---|---|---|
-| **ambiguous** | Two+ controls match the phrase | Rephrase using `inspect` labels |
+| **ambiguous** | Two+ controls match the phrase | Rephrase using `inspect` labels. For `type`, a heading+field that share a name is resolved to the field automatically. |
 | **not found** | Control missing or dump dropped it | Product bug, or phrase does not match `on screen` |
 | **timeout** | Waited `CONVOY_ACTION_TIMEOUT_MS` | App never reached the screen, or raise the timeout |
 

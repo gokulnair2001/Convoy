@@ -29,6 +29,8 @@ export async function runCommand(opts: RunOptions): Promise<number> {
   config.headed = headed;
   const reporter = new Reporter(!headed);
   reporter.banner(bannerFromConfig(config, headed));
+  const jevWarning = heuristicFallbackWarning(config);
+  if (jevWarning) reporter.warn(jevWarning);
 
   const cwd = process.cwd();
   const targets = resolveRunTargets(opts.files ?? [], cwd);
@@ -91,6 +93,14 @@ export async function runCommand(opts: RunOptions): Promise<number> {
     tracesDir: config.tracesDir,
   });
   return code;
+}
+
+/** Device/web runs without a key fall back to heuristic; say so instead of looking like live Jev. */
+export function heuristicFallbackWarning(config: ConvoyConfig): string | undefined {
+  if (config.platform === "fixture") return undefined;
+  if (config.jev.mode !== "heuristic") return undefined;
+  if (config.jev.apiKey) return undefined;
+  return "TYPESAFE_API_KEY is not set — using heuristic (name match on the tree, not live Jev). Add it to .env.";
 }
 
 export function bannerFromConfig(config: ConvoyConfig, headed: boolean): RunBanner {

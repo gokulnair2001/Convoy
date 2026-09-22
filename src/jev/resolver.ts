@@ -1,4 +1,4 @@
-import { elementsWithExactName, type Element } from "../core/element.js";
+import { elementsWithExactName, uniqueFieldForTyping, type Element } from "../core/element.js";
 import { NotFoundError } from "../core/errors.js";
 import { screenRows } from "../core/failure.js";
 import { gateResolve, throwResolve, type Gates } from "../core/gate.js";
@@ -24,6 +24,27 @@ export class Resolver {
 
   async resolve(intent: string, elements: Element[], step: string, traceDir?: string): Promise<ResolveHit> {
     const action = actionFromStep(step);
+    if (action === "type") {
+      const exact = elementsWithExactName(elements, intent);
+      const field = uniqueFieldForTyping(exact);
+      if (field) {
+        return exactHit(field, intent, elements, action, this.screenLabel);
+      }
+      const exactFields = exact.filter((el) => el.role === "textfield");
+      if (exactFields.length > 1) {
+        throwResolve(
+          {
+            outcome: "ambiguous",
+            reason: "two or more fields have this visible name",
+            top: exactFields.map((el) => ({ id: el.id, p: 1 })),
+          },
+          elements,
+          `"${intent}"`,
+          step,
+          traceDir,
+        );
+      }
+    }
     if (action === "see") {
       const exact = elementsWithExactName(elements, intent);
       if (exact.length === 1) {
@@ -79,6 +100,24 @@ export class Resolver {
     const present = action === "see" ? 1 : noulValue(response.answers.present);
     const decision = gateResolve({ present, target }, this.gates, action === "see" ? { strictTarget: true } : undefined);
 
+    if (decision.outcome === "ambiguous" && action === "type") {
+      const competitors = decision.top
+        .filter((t) => t.id !== "none")
+        .map((t) => elements.find((e) => e.id === t.id))
+        .filter((el): el is Element => Boolean(el));
+      const field = uniqueFieldForTyping(competitors);
+      if (field) {
+        return {
+          element: field,
+          present,
+          target: target.probabilities[field.id] ?? 0,
+          none: target.probabilities.none ?? 0,
+          request,
+          response,
+        };
+      }
+    }
+
     if (decision.outcome !== "pass") {
       throwResolve(decision, elements, `"${intent}"`, step, traceDir);
     }
@@ -126,7 +165,7 @@ export function resolveInstructions(kind: "present" | "target", action: ResolveA
       ? "The author's phrase is an intent; the visible label may differ. If one control's visible name matches the phrase (ignore case and punctuation), pick that control. If none match, the unique primary forward CTA (continue, next, submit, log in, sign in, done, save) may match even when the label differs. Side actions (Forgot password, Continue as guest, Use SSO, Create account) only match when the phrase names them. If two controls fit equally, pick none."
       : action === "see"
         ? "The author's phrase is an intent; the visible label may differ. If one control's visible name matches the phrase (ignore case and punctuation), pick that control. Otherwise pick the unique control whose name means the same thing. Do not infer from the kind of screen. Do not pick a unique forward CTA (continue, next, log in) unless the phrase names that action or that label. If two controls fit equally, or none do, pick none."
-        : "The author's phrase is an intent; the visible label may differ. If one field's visible name matches the phrase (ignore case and punctuation), pick that field. Prefer text fields. If two fields fit equally, pick none.";
+        : "The author's phrase is an intent; the visible label may differ. If one field's visible name matches the phrase (ignore case and punctuation), pick that field. Prefer text fields. If a heading/label and a text field share the same visible name, pick the field. If two fields fit equally, pick none.";
   const ask =
     kind === "present"
       ? `Does \`elements\` contain a unique ${action === "type" ? "field" : "control"} that fulfills this ${action}?`

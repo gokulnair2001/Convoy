@@ -599,15 +599,17 @@ A failed step prints what the test asked for, what the screen actually showed, s
 could not tap "Log in"
 
   waited    20s
-  scores    none 0.90  ·  present 0.08
+  scores
+    none      █████████░  0.90
+    present   █░░░░░░░░░  0.08
   on screen
     [1] Back
     [3] Email / Username
     [5] Continue
-
-  next      waited 20s and it never appeared — still loading, or the phrase does not match this UI
-            convoy inspect
-            raise CONVOY_ACTION_TIMEOUT_MS if the app is slow
+  next
+    waited 20s and it never appeared — still loading, or the phrase does not match this UI
+    convoy inspect
+    raise CONVOY_ACTION_TIMEOUT_MS if the app is slow
   traces    .convoy/runs/2026-09-19T16-28-20
 ```
 
