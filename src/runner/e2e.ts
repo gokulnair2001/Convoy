@@ -1,5 +1,5 @@
 import { beforeEach as vitestBeforeEach, test } from "vitest";
-import type { ConvoyConfig } from "../core/config.js";
+import { resolveEffectiveStart, type ConvoyConfig, type SessionStart } from "../core/config.js";
 import { loadConfig } from "../core/load-config.js";
 import { ConvoyError } from "../core/errors.js";
 import type { LifecycleLogger } from "../lifecycle/logger.js";
@@ -9,6 +9,21 @@ import { rethrowWithTrace, type Steps } from "./steps.js";
 
 export function shouldResetBetweenTests(config: ConvoyConfig): boolean {
   return config.lifecycle.resetBetweenTests;
+}
+
+/** Whether this journey relaunches (reset + ready.see). Attach keeps the current screen. */
+export function shouldLaunchJourney(
+  config: ConvoyConfig,
+  fileStart?: SessionStart,
+): { reset: boolean; readySee: boolean } {
+  const start = resolveEffectiveStart(config, fileStart);
+  if (start !== "launch") {
+    return { reset: false, readySee: false };
+  }
+  return {
+    reset: shouldResetBetweenTests(config),
+    readySee: Boolean(config.ready?.see),
+  };
 }
 
 const prepareLog: LifecycleLogger = {
@@ -48,6 +63,8 @@ export interface E2eOptions {
   platforms?: Array<"ios" | "android" | "web">;
   tags?: string[];
   fixture?: string;
+  /** File-level start. CLI lock (`sessionStartLocked`) still wins. */
+  start?: SessionStart;
   /** Authoring file shown in failures. YAML register sets this; TS infers from the stack. */
   file?: string;
 }
@@ -113,10 +130,11 @@ function registerTest(
     const session: Session = await createSession(config, name);
     try {
       session.reporter.beginTest(name);
-      if (shouldResetBetweenTests(config)) {
+      const { reset, readySee } = shouldLaunchJourney(config, opts.start);
+      if (reset) {
         await session.steps.resetApp();
       }
-      if (config.ready?.see) {
+      if (readySee && config.ready?.see) {
         await session.steps.see(config.ready.see);
       }
       const hooks = hooksByFile.get(file) ?? [];

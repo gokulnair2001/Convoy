@@ -31,7 +31,41 @@ export async function waitForSettle(
 }
 
 export function signature(elements: Element[]): string {
-  return elements.map((e) => `${e.role}:${e.name}:${e.value ?? ""}`).join("|");
+  return elements.map((e) => `${e.role}:${e.name}:${e.value ?? ""}:${e.enabled !== false}`).join("|");
+}
+
+/**
+ * Poll snapshots until `attempt` succeeds. Dump duration is the throttle — no
+ * sleep. After a retryable miss, skip Jev/resolve while the tree signature is
+ * unchanged; call attempt again only when the tree changes (or on the first dump).
+ */
+export async function waitUntilPresent<T>(
+  snapshot: () => Promise<Element[]>,
+  attempt: (elements: Element[]) => Promise<T>,
+  isRetryable: (err: unknown) => boolean,
+  opts: { timeoutMs: number },
+): Promise<T> {
+  const start = Date.now();
+  let lastSig: string | undefined;
+  let lastError: unknown;
+
+  for (;;) {
+    const elements = await snapshot();
+    const sig = signature(elements);
+
+    if (lastSig !== undefined && sig === lastSig) {
+      if (Date.now() - start >= opts.timeoutMs) throw lastError;
+      continue;
+    }
+
+    try {
+      return await attempt(elements);
+    } catch (err) {
+      if (!isRetryable(err) || Date.now() - start >= opts.timeoutMs) throw err;
+      lastSig = sig;
+      lastError = err;
+    }
+  }
 }
 
 export async function waitUntil<T>(

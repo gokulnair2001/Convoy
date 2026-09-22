@@ -6,8 +6,15 @@ export type { Gates, ResolveDecision, WhichDecision } from "./core/gate.js";
 export { AmbiguousError, NotFoundError, AssertionFailedError, ConvoyError, ToolError } from "./core/errors.js";
 export { formatFailure } from "./core/failure.js";
 export { loadConfig } from "./core/load-config.js";
-export { defaultConfig, applyEnv, mergeConfig } from "./core/config.js";
-export type { ConvoyConfig } from "./core/config.js";
+export {
+  defaultConfig,
+  applyEnv,
+  mergeConfig,
+  resolveEffectiveStart,
+  parseSessionStart,
+  parseTraceScreenshots,
+} from "./core/config.js";
+export type { ConvoyConfig, SessionStart, TraceScreenshots } from "./core/config.js";
 export { normalize, normalizeIos, normalizeAndroid, normalizeWeb } from "./core/normalize.js";
 export { Tracer } from "./core/trace.js";
 export { e2e } from "./runner/e2e.js";

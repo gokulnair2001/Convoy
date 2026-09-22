@@ -73,6 +73,7 @@ describe("parseYamlDocument", () => {
     expect(doc.platforms).toEqual(["ios"]);
     expect(doc.tags).toEqual(["smoke"]);
     expect(doc.fixture).toBe("tests/fixtures/signin.json");
+    expect(doc.start).toBeUndefined();
     expect(doc.steps).toEqual([
       { kind: "type", text: "${API_TOKEN}", into: "the search field" },
       { kind: "tap", intent: "Continue" },
@@ -107,6 +108,29 @@ steps:
       { kind: "see.not", intent: "toast" },
       { kind: "see.not", intent: "modal" },
     ]);
+  });
+
+  it("parses start: launch and start: attach", () => {
+    const launch = parseYamlDocument(
+      "name: from launch\nstart: launch\nsteps:\n  - tap: Go\n",
+      "launch.e2e.yaml",
+    );
+    expect(launch.start).toBe("launch");
+
+    const attach = parseYamlDocument(
+      "name: from attach\nstart: attach\nsteps:\n  - tap: Go\n",
+      "attach.e2e.yaml",
+    );
+    expect(attach.start).toBe("attach");
+  });
+
+  it("rejects start: reuse and unknown top-level keys", () => {
+    expect(() =>
+      parseYamlDocument("name: bad\nstart: reuse\nsteps:\n  - tap: Go\n", "reuse.e2e.yaml"),
+    ).toThrow(/reuse\.e2e\.yaml: start must be launch \| attach/);
+    expect(() =>
+      parseYamlDocument("name: extra\nfoo: bar\nsteps:\n  - tap: Go\n", "extra.e2e.yaml"),
+    ).toThrow(/extra\.e2e\.yaml: unknown keys: foo/);
   });
 
   it("throws when name is missing", () => {

@@ -1,7 +1,7 @@
 import type { ConvoyConfig } from "../core/config.js";
 import { ToolError } from "../core/errors.js";
 import { toolReport } from "../core/failure.js";
-import { installIosApp, launchIosApp } from "../drivers/ios.js";
+import { ensureIdbCompanion, installIosApp, launchIosApp } from "../drivers/ios.js";
 import { expandEnv } from "../util/expand.js";
 import type { LifecycleLogger } from "./logger.js";
 import {
@@ -29,6 +29,9 @@ export async function prepareIos(
     await bootSimulator(execFn, udid);
     log.done("simulator ready", Date.now() - started);
   }
+
+  // After boot (or whenever the UDID is known): start companion if needed. Never fail prepare.
+  await ensureIdbCompanion(udid, { exec: execFn, which: find, log });
 
   if (config.ios.simulator.open && config.headed) {
     log.phase("opening Simulator…");

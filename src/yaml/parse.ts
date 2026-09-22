@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import { parse } from "yaml";
+import { parseSessionStart, type SessionStart } from "../core/config.js";
 import { expandEnv } from "../util/expand.js";
 import { findYamlTestFiles, yamlRoot } from "./walk.js";
 
 const PLATFORMS = new Set(["ios", "android", "web"]);
-const TOP_KEYS = new Set(["name", "platforms", "tags", "fixture", "steps"]);
+const TOP_KEYS = new Set(["name", "platforms", "tags", "fixture", "start", "steps"]);
 const ACTION_KEYS = new Set([
   "tap",
   "type",
@@ -40,6 +41,7 @@ export interface ParsedYamlTest {
   platforms?: YamlPlatform[];
   tags?: string[];
   fixture?: string;
+  start?: SessionStart;
   steps: NormalizedStep[];
 }
 
@@ -73,6 +75,7 @@ export function parseYamlDocument(raw: string, filePath: string): ParsedYamlTest
     platforms: rec.platforms === undefined ? undefined : parsePlatforms(rec.platforms, filePath),
     tags: rec.tags === undefined ? undefined : parseStringList(rec.tags, filePath, "tags"),
     fixture: rec.fixture === undefined ? undefined : parseFixture(rec.fixture, filePath),
+    start: rec.start === undefined ? undefined : parseStart(rec.start, filePath),
     steps: rec.steps.map((step, index) => normalizeStep(step, filePath, `step[${index}]`)),
   };
 }
@@ -111,6 +114,17 @@ function parseFixture(value: unknown, filePath: string): string {
     throw new YamlAuthorError(`${filePath}: fixture must be a path string`);
   }
   return value;
+}
+
+function parseStart(value: unknown, filePath: string): SessionStart {
+  if (typeof value !== "string") {
+    throw new YamlAuthorError(`${filePath}: start must be launch | attach`);
+  }
+  const start = parseSessionStart(value);
+  if (!start) {
+    throw new YamlAuthorError(`${filePath}: start must be launch | attach`);
+  }
+  return start;
 }
 
 function normalizeStep(raw: unknown, filePath: string, loc: string): NormalizedStep {

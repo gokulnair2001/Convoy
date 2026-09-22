@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { loadConfig } from "../../src/core/load-config.js";
 import { createSession } from "../../src/runner/session.js";
 import { AmbiguousError, NotFoundError } from "../../src/core/errors.js";
+import type { Driver } from "../../src/core/driver.js";
 import { FixtureDriver } from "../../src/drivers/fixture.js";
 import type { JevClient, JevRequest, JevResponse } from "../../src/jev/types.js";
 
@@ -152,7 +153,26 @@ describe("signin fixture flow", () => {
         };
       },
     };
-    const driver = await FixtureDriver.fromFile("tests/fixtures/signin.json");
+    const inner = await FixtureDriver.fromFile("tests/fixtures/signin.json");
+    let snaps = 0;
+    const driver: Driver = {
+      kind: inner.kind,
+      async snapshot() {
+        const els = await inner.snapshot();
+        snaps += 1;
+        if (snaps < 2) return els;
+        return [
+          ...els,
+          { id: "e-home", role: "text", name: "Trips", enabled: true, bounds: [0, 0, 0.3, 0.05], ref: {} },
+        ];
+      },
+      tap: (el) => inner.tap(el),
+      type: (el, text) => inner.type(el, text),
+      reset: () => inner.reset(),
+      screenshot: () => inner.screenshot(),
+      back: () => inner.back(),
+      close: () => inner.close(),
+    };
     const session = await createSession(config, "which", { driver, jev });
     try {
       const screen = await session.steps.which(["a list of existing logins", "the home screen"]);

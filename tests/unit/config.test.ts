@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { applyEnv, defaultConfig, mergeConfig } from "../../src/core/config.js";
+import {
+  applyEnv,
+  defaultConfig,
+  mergeConfig,
+  parseSessionStart,
+  resolveEffectiveStart,
+} from "../../src/core/config.js";
 
 describe("config", () => {
   it("starts as a fixture-mode default with no hardcoded region", () => {
@@ -100,5 +106,39 @@ describe("config", () => {
     });
     expect(config.platform).toBe("web");
     expect(config.web.baseUrl).toBe("https://app.example.com");
+  });
+
+  it("defaults session start to launch and screenshots to failure", () => {
+    const config = defaultConfig();
+    expect(config.sessionStart).toBe("launch");
+    expect(config.sessionStartLocked).toBe(false);
+    expect(config.traceScreenshots).toBe("failure");
+  });
+
+  it("locks session start from CONVOY_START so a file cannot override", () => {
+    const locked = applyEnv(defaultConfig(), { CONVOY_START: "attach" });
+    expect(locked.sessionStart).toBe("attach");
+    expect(locked.sessionStartLocked).toBe(true);
+    expect(resolveEffectiveStart(locked, "launch")).toBe("attach");
+
+    const unlocked = defaultConfig();
+    expect(resolveEffectiveStart(unlocked, "attach")).toBe("attach");
+    expect(resolveEffectiveStart(unlocked)).toBe("launch");
+  });
+
+  it("parses session start and ignores junk", () => {
+    expect(parseSessionStart("launch")).toBe("launch");
+    expect(parseSessionStart("ATTACH")).toBe("attach");
+    expect(parseSessionStart("reuse")).toBeUndefined();
+  });
+
+  it("merges sessionStart and traceScreenshots from file config", () => {
+    const config = mergeConfig(defaultConfig(), {
+      sessionStart: "attach",
+      traceScreenshots: "all",
+    });
+    expect(config.sessionStart).toBe("attach");
+    expect(config.traceScreenshots).toBe("all");
+    expect(config.sessionStartLocked).toBe(false);
   });
 });

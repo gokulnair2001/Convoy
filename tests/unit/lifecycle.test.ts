@@ -7,7 +7,7 @@ import { prepareIos } from "../../src/lifecycle/ios.js";
 import { silentLogger } from "../../src/lifecycle/logger.js";
 import { prepareEnvironment, type ExecFn } from "../../src/lifecycle/prepare.js";
 import { prepareWeb } from "../../src/lifecycle/web.js";
-import { shouldResetBetweenTests } from "../../src/runner/e2e.js";
+import { shouldLaunchJourney, shouldResetBetweenTests } from "../../src/runner/e2e.js";
 import type { ExecResult } from "../../src/util/exec.js";
 
 interface RecordedCall {
@@ -67,6 +67,28 @@ describe("prepareEnvironment", () => {
 });
 
 describe("prepareIos", () => {
+  it("still boots when idb companion warm-up fails", async () => {
+    const { exec, calls } = recordingExec(async (command, args) => {
+      if (command === "idb" && args[0] === "connect") {
+        return { code: 1, stdout: "", stderr: "companion failed" };
+      }
+      return { code: 0, stdout: "", stderr: "" };
+    });
+
+    await expect(
+      prepareIos(iosConfig(), silentLogger, {
+        exec,
+        exists: () => true,
+        which: async (command) => (command === "idb" ? "/usr/local/bin/idb" : undefined),
+      }),
+    ).resolves.toEqual({ skipped: false, platform: "ios", detail: "UDID-TEST" });
+
+    expect(calls.some((c) => c.command === "xcrun" && c.args.includes("boot"))).toBe(true);
+    expect(calls.some((c) => c.command === "idb" && c.args[0] === "connect" && c.args.includes("UDID-TEST"))).toBe(
+      true,
+    );
+  });
+
   it("treats an already-booted simulator as success", async () => {
     const { exec, calls } = recordingExec(async (_command, args) => {
       if (args.includes("boot")) {
@@ -231,10 +253,40 @@ describe("shouldResetBetweenTests", () => {
   it("follows lifecycle.resetBetweenTests, including fixture", () => {
     const on = defaultConfig();
     expect(on.platform).toBe("fixture");
+    expect(on.sessionStart).toBe("launch");
     expect(shouldResetBetweenTests(on)).toBe(true);
 
     const off = defaultConfig();
     off.lifecycle.resetBetweenTests = false;
     expect(shouldResetBetweenTests(off)).toBe(false);
+  });
+});
+
+describe("shouldLaunchJourney", () => {
+  it("resets and waits for ready.see on default launch", () => {
+    const config = defaultConfig();
+    config.ready = { see: "the login screen", timeoutMs: 30_000 };
+    expect(shouldLaunchJourney(config)).toEqual({ reset: true, readySee: true });
+  });
+
+  it("skips reset and ready.see when start is attach", () => {
+    const config = defaultConfig();
+    config.ready = { see: "the login screen", timeoutMs: 30_000 };
+    expect(shouldLaunchJourney(config, "attach")).toEqual({ reset: false, readySee: false });
+  });
+
+  it("skips reset when resetBetweenTests is false even on launch", () => {
+    const config = defaultConfig();
+    config.lifecycle.resetBetweenTests = false;
+    config.ready = { see: "the login screen", timeoutMs: 30_000 };
+    expect(shouldLaunchJourney(config, "launch")).toEqual({ reset: false, readySee: true });
+  });
+
+  it("lets a CLI lock win over file start", () => {
+    const config = defaultConfig();
+    config.sessionStart = "attach";
+    config.sessionStartLocked = true;
+    config.ready = { see: "the login screen", timeoutMs: 30_000 };
+    expect(shouldLaunchJourney(config, "launch")).toEqual({ reset: false, readySee: false });
   });
 });

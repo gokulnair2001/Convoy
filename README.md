@@ -197,6 +197,8 @@ Project defaults. Example for iOS:
       "when": "missing"
     }
   },
+  "sessionStart": "launch",
+  "traceScreenshots": "failure",
   "reset": "relaunch",
   "lifecycle": {
     "install": true,
@@ -207,6 +209,10 @@ Project defaults. Example for iOS:
   "tracesDir": ".convoy/runs"
 }
 ```
+
+`sessionStart`: `launch` (default — reset, then optional `ready.see`) or `attach` (current screen). A file-level `start:` overrides this unless the CLI locked the run (`--reuse` / `--restart`, or `CONVOY_START`). Precedence: CLI flag > file `start` > config default.
+
+`traceScreenshots`: `failure` (default — screenshot on fail and the last passing step) or `all`. Override with `CONVOY_TRACE_SCREENSHOTS`.
 
 `build.when`: `missing` (default — run only if the `.app` / APK is not on disk), `always`, or `never`. `${CONVOY_IOS_UDID}` and other `CONVOY_*` / `TYPESAFE_*` names expand from the environment.
 
@@ -501,6 +507,10 @@ npx convoy run examples/auth/signin.e2e.yaml
 | `--step` | Pause before each action |
 | `--slow-mo <ms>` | Delay after each action |
 | `--junit` | Write `reports/junit.xml` |
+| `--reuse` | Attach for the whole run (no install, launch, or reset). Locks `sessionStart` |
+| `--restart` | Force launch for the whole run. Locks `sessionStart` |
+
+`--reuse` and `--restart` are mutually exclusive (exits `1`). They beat file `start:` and config `sessionStart`.
 
 A headed run looks like:
 

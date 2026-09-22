@@ -55,7 +55,9 @@ Do **not** invent waits, sleeps, locators, `getByRole`, `testId`, or `waitForSel
 
 ## YAML shape
 
-Required: `name`, non-empty `steps`. Optional: `platforms` (`ios` \| `android` \| `web`), `tags`, `fixture`.
+Required: `name`, non-empty `steps`. Optional: `platforms` (`ios` \| `android` \| `web`), `tags`, `fixture`, `start` (`launch` \| `attach`).
+
+`start: attach` begins on the current screen (no reset, no `ready.see`). Omit `start` to use config `sessionStart` (default `launch`). `convoy run --reuse` / `--restart` lock the whole run.
 
 Unknown top-level keys fail parse. One action per step.
 
@@ -84,6 +86,10 @@ Canonical example: `examples/auth/signin.e2e.yaml`.
 
 ```ts
 import { e2e } from "convoy-e2e";
+
+e2e("on this screen", { start: "attach" }, async (t) => {
+  await t.see("the home screen");
+});
 
 e2e.serial("driver signs in", { platforms: ["ios"], tags: ["smoke"] }, (step) => {
   step("enters credentials", async (t) => {

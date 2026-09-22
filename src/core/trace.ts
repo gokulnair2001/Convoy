@@ -26,6 +26,8 @@ export class Tracer {
   readonly dir: string;
   private readonly summary: TraceSummary;
   private stepIndex = 0;
+  private lastStepDir?: string;
+  private lastStepHasScreenshot = false;
 
   constructor(rootDir: string, platform: string, testName?: string, now = new Date()) {
     const stamp = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -65,7 +67,9 @@ export class Tracer {
     await writeJson(path.join(stepDir, "elements.json"), input.elements.map(toPublicElement));
     if (input.request !== undefined) await writeJson(path.join(stepDir, "request.json"), input.request);
     if (input.response !== undefined) await writeJson(path.join(stepDir, "response.json"), input.response);
+    this.lastStepHasScreenshot = Boolean(input.screenshot);
     if (input.screenshot) await writeFile(path.join(stepDir, "screen.png"), input.screenshot);
+    this.lastStepDir = stepDir;
 
     this.summary.steps.push({
       index: this.stepIndex,
@@ -79,6 +83,13 @@ export class Tracer {
     this.summary.costs.requests += input.request !== undefined ? 1 : 0;
     this.summary.costs.inputTokens += input.inputTokens ?? 0;
     return stepDir;
+  }
+
+  /** Write screen.png into the last step dir without recording a fake extra step. */
+  async attachScreenshotToLast(buf: Buffer): Promise<void> {
+    if (!this.lastStepDir || this.lastStepHasScreenshot) return;
+    await writeFile(path.join(this.lastStepDir, "screen.png"), buf);
+    this.lastStepHasScreenshot = true;
   }
 
   async finish(outcome: "pass" | "fail", error?: string): Promise<void> {

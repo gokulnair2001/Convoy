@@ -63,6 +63,8 @@ Do not set `ready.see` on `fixture` unless the fixture actually shows that copy.
 | `CONVOY_ANDROID_SERIAL` / `CONVOY_ANDROID_PACKAGE` / `CONVOY_ANDROID_APK` | Device + APK |
 | `CONVOY_WEB_BASE_URL` / `CONVOY_WEB_SERVER` | Playwright start URL / optional server command |
 | `CONVOY_ACTION_TIMEOUT_MS` | tap/type/see wait (default `20000`) |
+| `CONVOY_START` | `launch` \| `attach` — locks the whole run (same as `--restart` / `--reuse`) |
+| `CONVOY_TRACE_SCREENSHOTS` | `failure` (default: fail + last step) \| `all` |
 | `CONVOY_DEBUG_JEV` | `1` to print Jev Q&A (values redacted) |
 
 Jev stays host-side. The API key never goes into the app binary.
@@ -79,11 +81,13 @@ npx convoy run tests/smoke                  # folder
 npx convoy run path/to/flow.e2e.yaml        # one file (YAML + TS in one invocation can both hit the device)
 ```
 
-`run` flags: `--platform`, `--tag`, `--headed`, `--headless`, `--shard 1/4`, `--step`, `--slow-mo <ms>`, `--junit`.
+`run` flags: `--platform`, `--tag`, `--headed`, `--headless`, `--shard 1/4`, `--step`, `--slow-mo <ms>`, `--junit`, `--reuse`, `--restart`.
+
+`--reuse` attaches to the current screen for the whole run (no install, launch, or reset). `--restart` forces launch for the whole run. Do not pass both (exits `1`). CLI start beats file `start:` and config `sessionStart`.
 
 Skipped dirs: `node_modules`, `dist`, `.convoy`, `.git`. Passing a folder with no e2e files exits `1`.
 
-`inspect` / `capture` / `run` all boot / install / launch first (`prepareEnvironment`). Skip with `CONVOY_LIFECYCLE_INSTALL=0 CONVOY_LIFECYCLE_LAUNCH=0` if the app is already running.
+`inspect` / `capture` / `run` all boot / install / launch first (`prepareEnvironment`). `--reuse` skips install/launch. Or set `CONVOY_LIFECYCLE_INSTALL=0 CONVOY_LIFECYCLE_LAUNCH=0` if the app is already running.
 
 ## Platforms (what must already exist)
 

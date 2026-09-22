@@ -74,8 +74,12 @@ export class Resolver {
     const request: JevRequest = {
       state: buildJevState(this.screenLabel, elements, { includeValues: action !== "see" }),
       questions:
-        action === "see"
+        action === "type"
           ? {
+              present: {
+                type: "noul",
+                instructions: resolveInstructions("present", action, intent),
+              },
               target: {
                 type: "choice",
                 instructions: resolveInstructions("target", action, intent),
@@ -83,10 +87,6 @@ export class Resolver {
               },
             }
           : {
-              present: {
-                type: "noul",
-                instructions: resolveInstructions("present", action, intent),
-              },
               target: {
                 type: "choice",
                 instructions: resolveInstructions("target", action, intent),
@@ -97,7 +97,8 @@ export class Resolver {
 
     const response = await this.jev.systemOne(request);
     const target = asChoice(response.answers.target);
-    const present = action === "see" ? 1 : noulValue(response.answers.present);
+    // Tap/see ask only Choice. Use present=1 so gateResolve still applies choiceClear / none veto.
+    const present = action === "type" ? noulValue(response.answers.present) : 1;
     const decision = gateResolve({ present, target }, this.gates, action === "see" ? { strictTarget: true } : undefined);
 
     if (decision.outcome === "ambiguous" && action === "type") {

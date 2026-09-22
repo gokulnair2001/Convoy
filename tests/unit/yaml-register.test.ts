@@ -70,7 +70,32 @@ describe("registerYamlTests", () => {
     expect(e2e).toHaveBeenCalledTimes(1);
     expect(e2e).toHaveBeenCalledWith(
       "only yaml",
-      { platforms: ["web"], tags: ["smoke"], fixture: undefined, file: path.join(root, "only.e2e.yaml") },
+      {
+        platforms: ["web"],
+        tags: ["smoke"],
+        fixture: undefined,
+        start: undefined,
+        file: path.join(root, "only.e2e.yaml"),
+      },
+      expect.any(Function),
+    );
+  });
+
+  it("passes start through to e2e opts", () => {
+    const root = tmpRoot();
+    write(root, "attach.e2e.yaml", "name: stay here\nstart: attach\nsteps:\n  - see: the home screen\n");
+
+    registerYamlTests(root);
+
+    expect(e2e).toHaveBeenCalledWith(
+      "stay here",
+      {
+        platforms: undefined,
+        tags: undefined,
+        fixture: undefined,
+        start: "attach",
+        file: path.join(root, "attach.e2e.yaml"),
+      },
       expect.any(Function),
     );
   });
