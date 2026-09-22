@@ -107,7 +107,7 @@ Convoy will boot the iOS simulator, install, and launch. It will **not** start a
 
 | Gate | Meaning | Fix |
 |---|---|---|
-| **ambiguous** | Two+ controls match the phrase | Rephrase using `inspect` labels |
+| **ambiguous** | Two+ controls match the phrase | Rephrase using `inspect` labels. For `type`, a heading+field that share a name is resolved to the field automatically. |
 | **not found** | Control missing or dump dropped it | Product bug, or phrase does not match `on screen` |
 | **timeout** | Waited `CONVOY_ACTION_TIMEOUT_MS` | App never reached the screen, or raise the timeout |
 

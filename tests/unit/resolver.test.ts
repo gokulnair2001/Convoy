@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_GATES } from "../../src/core/gate.js";
 import { AmbiguousError, NotFoundError } from "../../src/core/errors.js";
-import { elementsWithExactName, textFieldForTyping, type Element } from "../../src/core/element.js";
+import { elementsWithExactName, textFieldForTyping, uniqueFieldForTyping, type Element } from "../../src/core/element.js";
 import { HeuristicJevClient } from "../../src/jev/client.js";
 import { Resolver } from "../../src/jev/resolver.js";
 import type { JevClient, JevRequest, JevResponse } from "../../src/jev/types.js";
@@ -144,10 +144,11 @@ describe("Resolver", () => {
       },
     };
     const resolver = new Resolver(jev, DEFAULT_GATES, "iOS · com.example.app");
-    await resolver.resolve("Email", login, `type into "Email"`);
+    await resolver.resolve("the email field", login, `type into "the email field"`);
     const instructions = seen?.questions.target.instructions ?? "";
     expect(instructions).toMatch(/Action: type/);
-    expect(instructions).toMatch(/Intent: Email/);
+    expect(instructions).toMatch(/Intent: the email field/);
+    expect(instructions).toMatch(/heading\/label and a text field/);
     expect(instructions).not.toMatch(/primary forward CTA/);
   });
 });
@@ -213,6 +214,83 @@ describe("textFieldForTyping", () => {
     field.bounds = [0.1, 0.5, 0.8, 0.06];
     field.value = "old@example.com";
     expect(textFieldForTyping([label, field], label)).toEqual(field);
+  });
+});
+
+describe("uniqueFieldForTyping", () => {
+  it("picks the field when a heading and the field share Username", () => {
+    const heading = el("e1", "text", "Username");
+    const field = el("e6", "textfield", "Username");
+    const continueBtn = el("e2", "button", "Continue");
+    expect(uniqueFieldForTyping([heading, field, continueBtn])?.id).toBe("e6");
+  });
+
+  it("stays unresolved when two fields share the name", () => {
+    expect(
+      uniqueFieldForTyping([el("e1", "textfield", "Username"), el("e2", "textfield", "Username")]),
+    ).toBeUndefined();
+  });
+
+  it("stays unresolved when two different fields compete", () => {
+    expect(uniqueFieldForTyping([el("e2", "textfield", "Email"), el("e3", "textfield", "Password")])).toBeUndefined();
+  });
+});
+
+describe("type resolve", () => {
+  const usernameScreen: Element[] = [
+    el("e1", "text", "Username"),
+    el("e2", "button", "Continue"),
+    el("e3", "text", "Convoy Tasks"),
+    el("e4", "text", "Sign in to manage your day"),
+    el("e6", "textfield", "Username"),
+    el("e7", "text", "Demo hint: any username works"),
+  ];
+
+  it("types into the Username field when a heading duplicates that name", async () => {
+    let calls = 0;
+    const jev: JevClient = {
+      async systemOne() {
+        calls += 1;
+        throw new Error("label+field same name must not call Jev");
+      },
+    };
+    const resolver = new Resolver(jev, DEFAULT_GATES, "iOS · app");
+    const hit = await resolver.resolve("Username", usernameScreen, `type into "Username"`);
+    expect(calls).toBe(0);
+    expect(hit.element.id).toBe("e6");
+    expect(hit.element.role).toBe("textfield");
+  });
+
+  it("still sees Username as ambiguous when the heading and field share the name", async () => {
+    const resolver = new Resolver(new HeuristicJevClient(), DEFAULT_GATES, "iOS · app");
+    await expect(resolver.resolve("Username", usernameScreen, `see "Username"`)).rejects.toBeInstanceOf(AmbiguousError);
+  });
+
+  it("collapses a 0.56/0.43 Jev split between the heading and the field", async () => {
+    const jev: JevClient = {
+      async systemOne() {
+        return {
+          answers: {
+            present: { type: "noul", noul: 0.97 },
+            target: {
+              type: "choice",
+              choice: "e1",
+              probabilities: { e1: 0.56, e6: 0.43, none: 0.01 },
+            },
+          },
+        };
+      },
+    };
+    const resolver = new Resolver(jev, DEFAULT_GATES, "iOS · app");
+    const hit = await resolver.resolve("the username field", usernameScreen, `type into "the username field"`);
+    expect(hit.element.id).toBe("e6");
+    expect(hit.element.role).toBe("textfield");
+  });
+
+  it("stays ambiguous when two Username fields compete", async () => {
+    const screen = [el("e1", "textfield", "Username"), el("e2", "textfield", "Username")];
+    const resolver = new Resolver(new HeuristicJevClient(), DEFAULT_GATES, "iOS · app");
+    await expect(resolver.resolve("Username", screen, `type into "Username"`)).rejects.toBeInstanceOf(AmbiguousError);
   });
 });
 

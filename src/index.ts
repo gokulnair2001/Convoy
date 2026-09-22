@@ -1,5 +1,5 @@
 export type { Element, Platform, Role, Bounds, PublicElement } from "./core/element.js";
-export { toPublicElement, formatElement, fieldHasText, textFieldForTyping } from "./core/element.js";
+export { toPublicElement, formatElement, fieldHasText, textFieldForTyping, uniqueFieldForTyping } from "./core/element.js";
 export type { Driver } from "./core/driver.js";
 export { DEFAULT_GATES, gateResolve, gateAssert, gateWhich } from "./core/gate.js";
 export type { Gates, ResolveDecision, WhichDecision } from "./core/gate.js";
