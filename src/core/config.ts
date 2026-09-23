@@ -4,6 +4,10 @@ import { DEFAULT_GATES, type Gates } from "./gate.js";
 export type ResetStrategy = "relaunch" | "clear" | "reinstall";
 export type JevMode = "live" | "heuristic" | "recorded";
 export type BuildWhen = "missing" | "always" | "never";
+/** How a journey begins. Config default, file may override, CLI may lock the whole run. */
+export type SessionStart = "launch" | "attach";
+/** When to write screen.png into traces. Default `failure` (failing step + last step of a pass). */
+export type TraceScreenshots = "failure" | "all";
 
 export interface AppConfig {
   bundleId: string;
@@ -96,6 +100,12 @@ export interface ConvoyConfig {
   stepMode: boolean;
   tag?: string;
   tracesDir: string;
+  /** Default journey start. File `start:` overrides unless `sessionStartLocked`. */
+  sessionStart: SessionStart;
+  /** True when CLI/env set CONVOY_START — file-level `start` must not win. */
+  sessionStartLocked: boolean;
+  /** Default `failure`: screenshot on fail and the last passing step. `all` = every step. */
+  traceScreenshots: TraceScreenshots;
   reset: ResetStrategy;
   /** How long tap/type/see wait for a control after a screen change (network, animation). */
   actionTimeoutMs: number;
@@ -114,6 +124,8 @@ export interface ConvoyConfigFile {
   platform?: Platform;
   headed?: boolean;
   tracesDir?: string;
+  sessionStart?: SessionStart;
+  traceScreenshots?: TraceScreenshots;
   reset?: ResetStrategy;
   actionTimeoutMs?: number;
   gates?: Partial<Gates>;
@@ -149,6 +161,9 @@ export function defaultConfig(): ConvoyConfig {
     slowMoMs: 0,
     stepMode: false,
     tracesDir: ".convoy/runs",
+    sessionStart: "launch",
+    sessionStartLocked: false,
+    traceScreenshots: "failure",
     reset: "relaunch",
     actionTimeoutMs: 20_000,
     gates: { ...DEFAULT_GATES },
@@ -188,6 +203,17 @@ export function applyEnv(config: ConvoyConfig, env: NodeJS.ProcessEnv = process.
   if (env.CONVOY_STEP !== undefined) next.stepMode = parseBool(env.CONVOY_STEP, next.stepMode);
   if (env.CONVOY_TAG) next.tag = env.CONVOY_TAG;
   if (env.CONVOY_TRACES_DIR) next.tracesDir = env.CONVOY_TRACES_DIR;
+  if (env.CONVOY_START) {
+    const start = parseSessionStart(env.CONVOY_START);
+    if (start) {
+      next.sessionStart = start;
+      next.sessionStartLocked = true;
+    }
+  }
+  if (env.CONVOY_TRACE_SCREENSHOTS) {
+    const shots = parseTraceScreenshots(env.CONVOY_TRACE_SCREENSHOTS);
+    if (shots) next.traceScreenshots = shots;
+  }
   if (env.CONVOY_RESET) next.reset = env.CONVOY_RESET as ResetStrategy;
   if (env.CONVOY_ACTION_TIMEOUT_MS) {
     next.actionTimeoutMs = Number(env.CONVOY_ACTION_TIMEOUT_MS) || next.actionTimeoutMs;
@@ -272,7 +298,7 @@ export function applyEnv(config: ConvoyConfig, env: NodeJS.ProcessEnv = process.
 export function mergeConfig(base: ConvoyConfig, file: ConvoyConfigFile): ConvoyConfig {
   return {
     ...base,
-    ...pickDefined(file, ["platform", "headed", "tracesDir", "reset", "actionTimeoutMs"]),
+    ...pickDefined(file, ["platform", "headed", "tracesDir", "sessionStart", "traceScreenshots", "reset", "actionTimeoutMs"]),
     gates: { ...base.gates, ...file.gates },
     app: { ...base.app, ...file.app },
     ios: {
@@ -293,6 +319,24 @@ export function mergeConfig(base: ConvoyConfig, file: ConvoyConfigFile): ConvoyC
     lifecycle: { ...base.lifecycle, ...file.lifecycle },
     ready: file.ready || base.ready ? { see: "", timeoutMs: 30_000, ...base.ready, ...file.ready } : undefined,
   };
+}
+
+export function parseSessionStart(value: string | undefined): SessionStart | undefined {
+  const v = value?.trim().toLowerCase();
+  if (v === "launch" || v === "attach") return v;
+  return undefined;
+}
+
+export function parseTraceScreenshots(value: string | undefined): TraceScreenshots | undefined {
+  const v = value?.trim().toLowerCase();
+  if (v === "failure" || v === "all") return v;
+  return undefined;
+}
+
+/** CLI lock > file `start` > config default. */
+export function resolveEffectiveStart(config: ConvoyConfig, fileStart?: SessionStart): SessionStart {
+  if (config.sessionStartLocked) return config.sessionStart;
+  return fileStart ?? config.sessionStart;
 }
 
 function pickDefined<T extends object, K extends keyof T>(obj: T, keys: K[]): Partial<Pick<T, K>> {

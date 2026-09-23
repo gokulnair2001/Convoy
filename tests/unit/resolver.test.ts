@@ -117,13 +117,51 @@ describe("Resolver", () => {
     };
     const resolver = new Resolver(jev, DEFAULT_GATES, "iOS · com.example.app");
     await resolver.resolve("continue", login, `tap "continue"`);
-    const present = seen?.questions.present.instructions ?? "";
+    expect(seen?.questions.present).toBeUndefined();
     const target = seen?.questions.target.instructions ?? "";
-    expect(present).toMatch(/Action: tap/);
-    expect(present).toMatch(/Intent: continue/);
-    expect(present).toMatch(/visible label may differ/);
+    expect(target).toMatch(/Action: tap/);
+    expect(target).toMatch(/Intent: continue/);
     expect(target).toMatch(/primary forward CTA/);
     expect(target).not.toMatch(/Which element in `elements` is: continue/);
+  });
+
+  it("sends only target Choice for tap and present plus target for type", async () => {
+    const seen: JevRequest[] = [];
+    const jev: JevClient = {
+      async systemOne(request) {
+        seen.push(request);
+        return {
+          answers: {
+            present: { type: "noul", noul: 0.98 },
+            target: {
+              type: "choice",
+              choice: "e2",
+              probabilities: { e2: 0.94, none: 0.01 },
+            },
+          },
+        };
+      },
+    };
+    const resolver = new Resolver(jev, DEFAULT_GATES, "iOS · com.example.app");
+    await resolver.resolve("the sign in button", login, `tap "the sign in button"`);
+    await resolver.resolve("the email field", login, `type into "the email field"`);
+    expect(Object.keys(seen[0]!.questions)).toEqual(["target"]);
+    expect(seen[0]!.questions.present).toBeUndefined();
+    expect(Object.keys(seen[1]!.questions).sort()).toEqual(["present", "target"]);
+    expect(seen[1]!.questions.present?.type).toBe("noul");
+    expect(seen[1]!.questions.target?.type).toBe("choice");
+  });
+
+  it("throws NOT FOUND when tap Choice picks none and present noul is absent", async () => {
+    const jev = new ScriptedClient({
+      answers: {
+        target: { type: "choice", choice: "none", probabilities: { e4: 0.04, none: 0.9 } },
+      },
+    });
+    const resolver = new Resolver(jev, DEFAULT_GATES, "iOS · com.example.app");
+    await expect(resolver.resolve("the submit invoice button", login, `tap "the submit invoice button"`)).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 
   it("does not apply forward-CTA synonym rules when typing into a field", async () => {

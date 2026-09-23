@@ -60,6 +60,8 @@ describe("initCommand", () => {
     const config = JSON.parse(await readFile(path.join(cwd, "convoy.config.json"), "utf8")) as {
       platform: string;
       tracesDir: string;
+      sessionStart: string;
+      traceScreenshots: string;
       reset: string;
       lifecycle: { install: boolean; launch: boolean; resetBetweenTests: boolean };
       app: { bundleId: string; package: string; displayName: string };
@@ -68,6 +70,8 @@ describe("initCommand", () => {
     };
     expect(config.platform).toBe("fixture");
     expect(config.tracesDir).toBe(".convoy/runs");
+    expect(config.sessionStart).toBe("launch");
+    expect(config.traceScreenshots).toBe("failure");
     expect(config.reset).toBe("relaunch");
     expect(config.lifecycle).toEqual({ install: true, launch: true, resetBetweenTests: true });
     expect(config.app.bundleId).toBe("com.example.app");

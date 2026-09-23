@@ -49,6 +49,7 @@ export async function createSession(
     slowMoMs: config.slowMoMs,
     stepMode: config.stepMode,
     actionTimeoutMs: config.actionTimeoutMs,
+    traceScreenshots: config.traceScreenshots,
   });
   return {
     steps,

@@ -41,7 +41,7 @@ export function registerYamlTests(root: string = yamlRoot()): void {
     if (registeredFiles.has(abs)) continue;
     registeredFiles.add(abs);
     const doc = parseYamlDocument(fs.readFileSync(abs, "utf8"), abs);
-    e2e(doc.name, { platforms: doc.platforms, tags: doc.tags, fixture: doc.fixture, file: abs }, async (t) => {
+    e2e(doc.name, { platforms: doc.platforms, tags: doc.tags, fixture: doc.fixture, start: doc.start, file: abs }, async (t) => {
       await executeSteps(t, doc.steps, { file: abs });
     });
   }

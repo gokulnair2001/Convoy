@@ -274,6 +274,8 @@ function buildConfigFile(
       package: app.package,
     },
     tracesDir: ".convoy/runs",
+    sessionStart: "launch",
+    traceScreenshots: "failure",
     reset: "relaunch",
     lifecycle: {
       install: true,

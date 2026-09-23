@@ -20,6 +20,28 @@ export interface RunOptions {
   slowMo?: number;
   platform?: string;
   junit?: boolean;
+  reuse?: boolean;
+  restart?: boolean;
+}
+
+/** CLI `--reuse` / `--restart` lock the whole run. Mutates `config`. */
+export function applyRunSessionFlags(
+  config: ConvoyConfig,
+  opts: Pick<RunOptions, "reuse" | "restart">,
+): { ok: true } | { ok: false; message: string } {
+  if (opts.reuse && opts.restart) {
+    return { ok: false, message: "--reuse and --restart cannot be used together" };
+  }
+  if (opts.reuse) {
+    config.sessionStart = "attach";
+    config.sessionStartLocked = true;
+    config.lifecycle.install = false;
+    config.lifecycle.launch = false;
+  } else if (opts.restart) {
+    config.sessionStart = "launch";
+    config.sessionStartLocked = true;
+  }
+  return { ok: true };
 }
 
 export async function runCommand(opts: RunOptions): Promise<number> {
@@ -28,6 +50,11 @@ export async function runCommand(opts: RunOptions): Promise<number> {
   if (opts.platform) config.platform = opts.platform as ConvoyConfig["platform"];
   config.headed = headed;
   const reporter = new Reporter(!headed);
+  const sessionFlags = applyRunSessionFlags(config, opts);
+  if (!sessionFlags.ok) {
+    reporter.fail("run", "flags", sessionFlags.message);
+    return 1;
+  }
   reporter.banner(bannerFromConfig(config, headed));
   const jevWarning = heuristicFallbackWarning(config);
   if (jevWarning) reporter.warn(jevWarning);
@@ -63,6 +90,8 @@ export async function runCommand(opts: RunOptions): Promise<number> {
     CONVOY_E2E: "1",
   };
   if (opts.tag) env.CONVOY_TAG = opts.tag;
+  if (opts.reuse) env.CONVOY_START = "attach";
+  if (opts.restart) env.CONVOY_START = "launch";
   if (!targets.all) env.CONVOY_YAML_FILES = encodeYamlFilesEnv(targets.yaml);
 
   const pkgRoot = thisPackageRoot(import.meta.url);

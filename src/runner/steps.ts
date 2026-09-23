@@ -1,9 +1,10 @@
+import type { TraceScreenshots } from "../core/config.js";
 import type { Driver } from "../core/driver.js";
 import { formatElement, textFieldForTyping, type Element, type LogicalPlatform } from "../core/element.js";
 import { AmbiguousError, AssertionFailedError, ConvoyError, NotFoundError, enrichFailure } from "../core/errors.js";
 import { formatFailure, rankedScores, screenRows, type FailureReport } from "../core/failure.js";
 import { gateWhich, type Gates } from "../core/gate.js";
-import { waitForSettle, waitUntil } from "../core/settle.js";
+import { waitForSettle, waitUntilPresent } from "../core/settle.js";
 import type { Tracer } from "../core/trace.js";
 import { intentForWhichKey, type ClassifyResult, type Oracle } from "../jev/oracle.js";
 import type { ResolveHit, Resolver } from "../jev/resolver.js";
@@ -21,6 +22,7 @@ export interface StepContext {
   slowMoMs: number;
   stepMode: boolean;
   actionTimeoutMs: number;
+  traceScreenshots: TraceScreenshots;
 }
 
 type PlatformFns = Partial<Record<LogicalPlatform, () => Promise<void> | void>>;
@@ -42,7 +44,6 @@ export class Steps {
     const { elements, hit } = await this.resolveWhenPresent(intent, `tap "${intent}"`);
     await this.ctx.driver.tap(hit.element);
     const ms = Date.now() - started;
-    const screenshot = await this.ctx.driver.screenshot();
     await this.ctx.tracer.recordStep({
       action: "tap",
       intent,
@@ -51,7 +52,7 @@ export class Steps {
       elements,
       request: hit.request,
       response: hit.response,
-      screenshot,
+      screenshot: await this.screenshotFor("pass"),
       element: { id: hit.element.id, name: hit.element.name },
       probability: hit.target,
     });
@@ -66,7 +67,6 @@ export class Steps {
     const target = textFieldForTyping(elements, hit.element);
     await this.ctx.driver.type(target, text);
     const ms = Date.now() - started;
-    const screenshot = await this.ctx.driver.screenshot();
     await this.ctx.tracer.recordStep({
       action: "type",
       intent: opts.into,
@@ -75,7 +75,7 @@ export class Steps {
       elements,
       request: hit.request,
       response: hit.response,
-      screenshot,
+      screenshot: await this.screenshotFor("pass"),
       element: { id: target.id, name: target.name },
       probability: hit.target,
     });
@@ -103,7 +103,7 @@ export class Steps {
       elements,
       request: result.request,
       response: result.response,
-      screenshot: await this.ctx.driver.screenshot(),
+      screenshot: await this.screenshotFor(hit.outcome === "pass" ? "pass" : "fail"),
       probability: hit.probability,
     });
     this.ctx.reporter.score(intent, hit.probability);
@@ -142,10 +142,13 @@ export class Steps {
     let lastClassify: ClassifyResult | undefined;
 
     try {
-      const { intent, probability, elements, result } = await waitUntil(
+      const { intent, probability, elements, result } = await waitUntilPresent(
         async () => {
           const elements = await this.ctx.driver.snapshot();
           lastElements = elements;
+          return elements;
+        },
+        async (elements) => {
           const result = await this.ctx.oracle.classify(intents, elements);
           lastClassify = result;
           const decision = gateWhich(result.target, this.ctx.gates);
@@ -174,7 +177,7 @@ export class Steps {
           return { intent, probability, elements, result };
         },
         (err) => err instanceof NotFoundError,
-        { timeoutMs: this.ctx.actionTimeoutMs, intervalMs: 750 },
+        { timeoutMs: this.ctx.actionTimeoutMs },
       );
       await this.ctx.tracer.recordStep({
         action: "which",
@@ -184,7 +187,7 @@ export class Steps {
         elements,
         request: result.request,
         response: result.response,
-        screenshot: await this.ctx.driver.screenshot(),
+        screenshot: await this.screenshotFor("pass"),
         probability,
       });
       this.ctx.reporter.which(intent, probability);
@@ -200,7 +203,7 @@ export class Steps {
           elements: lastElements,
           request: lastClassify?.request,
           response: lastClassify?.response,
-          screenshot: await this.ctx.driver.screenshot(),
+          screenshot: await this.screenshotFor("fail"),
         });
       } catch {
         // keep the original which failure even if tracing the last dump fails
@@ -222,7 +225,8 @@ export class Steps {
   }
 
   async flush(): Promise<void> {
-    // reserved for batched see() — each see() is its own resolve
+    if (this.ctx.traceScreenshots === "all") return;
+    await this.ctx.tracer.attachScreenshotToLast(await this.ctx.driver.screenshot());
   }
 
   async seeAll(intents: Array<string | { not: string }>): Promise<void> {
@@ -255,7 +259,7 @@ export class Steps {
       elements,
       request: hit.request,
       response: hit.response,
-      screenshot: await this.ctx.driver.screenshot(),
+      screenshot: await this.screenshotFor("pass"),
       element: { id: hit.element.id, name: hit.element.name },
       probability: hit.target,
     });
@@ -288,7 +292,7 @@ export class Steps {
           outcome: "pass",
           ms: Date.now() - started,
           elements,
-          screenshot: await this.ctx.driver.screenshot(),
+          screenshot: await this.screenshotFor("pass"),
           probability: 0,
         });
         this.ctx.reporter.see(intent, 0, true);
@@ -310,15 +314,18 @@ export class Steps {
     const started = Date.now();
     let lastElements: Element[] = [];
     try {
-      return await waitUntil(
+      return await waitUntilPresent(
         async () => {
           const elements = await this.ctx.driver.snapshot();
           lastElements = elements;
+          return elements;
+        },
+        async (elements) => {
           const hit = await this.ctx.resolver.resolve(intent, elements, step, this.ctx.tracer.dir);
           return { elements, hit };
         },
         (err) => err instanceof NotFoundError,
-        { timeoutMs: this.ctx.actionTimeoutMs, intervalMs: 750 },
+        { timeoutMs: this.ctx.actionTimeoutMs },
       );
     } catch (err) {
       throw enrichFailure(err, {
@@ -337,6 +344,13 @@ export class Steps {
 
   private async afterAction(): Promise<void> {
     if (this.ctx.slowMoMs > 0) await sleep(this.ctx.slowMoMs);
+  }
+
+  private async screenshotFor(kind: "pass" | "fail"): Promise<Buffer | undefined> {
+    if (kind === "fail" || this.ctx.traceScreenshots === "all") {
+      return this.ctx.driver.screenshot();
+    }
+    return undefined;
   }
 }
 

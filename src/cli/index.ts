@@ -26,6 +26,8 @@ program
   .option("--slow-mo <ms>", "delay after each action", (v) => Number(v))
   .option("--platform <name>", "fixture | ios | android | web")
   .option("--junit", "write reports/junit.xml")
+  .option("--reuse", "attach to the current screen for the whole run")
+  .option("--restart", "force launch for the whole run")
   .action(async (files: string[], opts) => {
     const code = await runCommand({
       files,
@@ -37,6 +39,8 @@ program
       slowMo: opts.slowMo,
       platform: opts.platform,
       junit: opts.junit,
+      reuse: Boolean(opts.reuse),
+      restart: Boolean(opts.restart),
     });
     process.exitCode = code;
   });

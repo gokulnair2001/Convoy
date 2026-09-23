@@ -17,7 +17,37 @@ export interface IosToolDeps {
     args: string[],
     opts?: { timeoutMs?: number; env?: NodeJS.ProcessEnv },
   ) => Promise<string>;
+  exec?: (
+    command: string,
+    args: string[],
+    opts?: { timeoutMs?: number; env?: NodeJS.ProcessEnv },
+  ) => Promise<{ code: number; stdout: string; stderr: string }>;
   which?: (command: string) => Promise<string | undefined>;
+  log?: { warn(label: string): void };
+}
+
+/** fb-idb `connect` starts companion for a target; keep this short so prepare cannot hang. */
+const IDB_COMPANION_TIMEOUT_MS = 10_000;
+
+/**
+ * Cache `which("idb")` so snapshot/tap/type do not spawn `which` on every call.
+ * Injected `find` functions are wrapped the same way (one lookup per helper instance).
+ */
+export function cachedIdbWhich(
+  find: (command: string) => Promise<string | undefined>,
+): (command: string) => Promise<string | undefined> {
+  let cached: Promise<string | undefined> | undefined;
+  return async (command: string) => {
+    if (command !== "idb") return find(command);
+    cached ??= find("idb");
+    return cached;
+  };
+}
+
+const defaultFindIdb = cachedIdbWhich(which);
+
+function findIdb(deps: IosToolDeps): (command: string) => Promise<string | undefined> {
+  return deps.which ?? defaultFindIdb;
 }
 
 interface IosRef {
@@ -41,9 +71,31 @@ function iosEnv(udid?: string): NodeJS.ProcessEnv {
   return env;
 }
 
+/**
+ * Start idb companion for `udid` if needed (`idb connect <udid>`).
+ * Failures are ignored — later CLI ui/tap/text/screenshot calls still spawn as today.
+ */
+export async function ensureIdbCompanion(udid: string, deps: IosToolDeps = {}): Promise<void> {
+  const find = findIdb(deps);
+  try {
+    if (!(await find("idb"))) return;
+    const args = ["connect", udid];
+    const opts = { timeoutMs: IDB_COMPANION_TIMEOUT_MS, env: iosEnv(udid) };
+    if (deps.exec) {
+      const result = await deps.exec("idb", args, opts);
+      if (result.code !== 0) deps.log?.warn("idb companion warm-up failed; continuing");
+      return;
+    }
+    const run = deps.execOk ?? execOk;
+    await run("idb", args, opts);
+  } catch {
+    deps.log?.warn("idb companion warm-up failed; continuing");
+  }
+}
+
 export async function installIosApp(appPath: string, udid?: string, deps: IosToolDeps = {}): Promise<void> {
   const run = deps.execOk ?? execOk;
-  const find = deps.which ?? which;
+  const find = findIdb(deps);
   const env = iosEnv(udid);
   if (await find("idb")) {
     await run("idb", idbArgs(["install", appPath], udid), { timeoutMs: 120_000, env });
@@ -62,7 +114,7 @@ export async function installIosApp(appPath: string, udid?: string, deps: IosToo
 
 export async function launchIosApp(bundleId: string, udid?: string, deps: IosToolDeps = {}): Promise<void> {
   const run = deps.execOk ?? execOk;
-  const find = deps.which ?? which;
+  const find = findIdb(deps);
   const env = iosEnv(udid);
   if (await find("idb")) {
     await run("idb", idbArgs(["launch", bundleId], udid), { env });
@@ -82,11 +134,18 @@ export async function launchIosApp(bundleId: string, udid?: string, deps: IosToo
 export class IosDriver implements Driver {
   readonly kind = "ios" as const;
   private screen: PixelFrame = { x: 0, y: 0, width: 390, height: 844 };
+  private idbBin?: string;
+  private readonly findIdb: (command: string) => Promise<string | undefined>;
+  private readonly run: NonNullable<IosToolDeps["execOk"]>;
 
   constructor(
     private readonly config: IosConfig,
     private readonly resetStrategy: ResetStrategy = "clear",
-  ) {}
+    deps: IosToolDeps = {},
+  ) {
+    this.findIdb = deps.which ? cachedIdbWhich(deps.which) : defaultFindIdb;
+    this.run = deps.execOk ?? execOk;
+  }
 
   async snapshot(): Promise<Element[]> {
     const stdout = await this.idb(["ui", "describe-all", "--nested"], { timeoutMs: 60_000 });
@@ -174,10 +233,16 @@ export class IosDriver implements Driver {
     return JSON.parse(stdout) as unknown;
   }
 
+  private async resolveIdbBin(): Promise<string> {
+    if (this.idbBin !== undefined) return this.idbBin;
+    this.idbBin = (await this.findIdb("idb")) ?? "idb";
+    return this.idbBin;
+  }
+
   private async idb(args: string[], opts: { timeoutMs?: number } = {}): Promise<string> {
-    const env = { ...process.env };
-    if (this.config.udid) env.IDB_UDID = this.config.udid;
-    return execOk("idb", idbArgs(args, this.config.udid), { timeoutMs: opts.timeoutMs, env });
+    const env = iosEnv(this.config.udid);
+    const bin = await this.resolveIdbBin();
+    return this.run(bin, idbArgs(args, this.config.udid), { timeoutMs: opts.timeoutMs, env });
   }
 }
 
