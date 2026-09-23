@@ -9,4 +9,6 @@ Before answering, read the matching skill:
 | Install, configure, run, inspect, debug | [agent/use-convoy/SKILL.md](agent/use-convoy/SKILL.md) |
 | Natural-language flow → YAML or TypeScript test | [agent/write-e2e-tests/SKILL.md](agent/write-e2e-tests/SKILL.md) |
 
-Do not invent locators, test IDs, or sleeps. Put secrets in `.env`, never in `convoy.config.json` or test files.
+Journeys default to `launch` (reset + optional `ready.see`). Use file `start: attach` or `convoy run --reuse` to stay on the current screen. Traces screenshot on failure (and the last passing step) unless `CONVOY_TRACE_SCREENSHOTS=all`.
+
+Do not invent locators, test IDs, or sleeps — tap/type/see already retry, and unchanged screens skip extra matching work. Put secrets in `.env`, never in `convoy.config.json` or test files.

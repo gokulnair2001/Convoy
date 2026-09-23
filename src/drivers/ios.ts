@@ -10,6 +10,12 @@ import type { IosConfig, ResetStrategy } from "../core/config.js";
 import { normalizeIos } from "../core/normalize.js";
 import { ToolError } from "../core/errors.js";
 import { execOk, which } from "../util/exec.js";
+import {
+  IdbGrpcTransportError,
+  mapIdbArgsToOp,
+  openIdbGrpcSession,
+  type IdbGrpcSession,
+} from "./idb-session.js";
 
 export interface IosToolDeps {
   execOk?: (
@@ -24,6 +30,11 @@ export interface IosToolDeps {
   ) => Promise<{ code: number; stdout: string; stderr: string }>;
   which?: (command: string) => Promise<string | undefined>;
   log?: { warn(label: string): void };
+  /** Injected in tests. Production opens a long-lived Python gRPC helper. */
+  openGrpcSession?: (opts: {
+    udid?: string;
+    idbBin: string;
+  }) => Promise<IdbGrpcSession | undefined>;
 }
 
 /** fb-idb `connect` starts companion for a target; keep this short so prepare cannot hang. */
@@ -73,7 +84,7 @@ function iosEnv(udid?: string): NodeJS.ProcessEnv {
 
 /**
  * Start idb companion for `udid` if needed (`idb connect <udid>`).
- * Failures are ignored — later CLI ui/tap/text/screenshot calls still spawn as today.
+ * Failures are ignored — the live gRPC helper (or CLI fallback) still talks to companion.
  */
 export async function ensureIdbCompanion(udid: string, deps: IosToolDeps = {}): Promise<void> {
   const find = findIdb(deps);
@@ -135,8 +146,12 @@ export class IosDriver implements Driver {
   readonly kind = "ios" as const;
   private screen: PixelFrame = { x: 0, y: 0, width: 390, height: 844 };
   private idbBin?: string;
+  private grpc?: IdbGrpcSession;
+  private grpcOpening?: Promise<IdbGrpcSession | undefined>;
+  private grpcDisabled = false;
   private readonly findIdb: (command: string) => Promise<string | undefined>;
   private readonly run: NonNullable<IosToolDeps["execOk"]>;
+  private readonly openGrpcSession?: IosToolDeps["openGrpcSession"];
 
   constructor(
     private readonly config: IosConfig,
@@ -145,6 +160,7 @@ export class IosDriver implements Driver {
   ) {
     this.findIdb = deps.which ? cachedIdbWhich(deps.which) : defaultFindIdb;
     this.run = deps.execOk ?? execOk;
+    this.openGrpcSession = deps.openGrpcSession ?? (deps.execOk ? undefined : openIdbGrpcSession);
   }
 
   async snapshot(): Promise<Element[]> {
@@ -225,6 +241,11 @@ export class IosDriver implements Driver {
   }
 
   async close(): Promise<void> {
+    const session = this.grpc;
+    this.grpc = undefined;
+    this.grpcOpening = undefined;
+    this.grpcDisabled = false;
+    await session?.close();
     // companion stays running
   }
 
@@ -239,9 +260,43 @@ export class IosDriver implements Driver {
     return this.idbBin;
   }
 
+  private async grpcSession(): Promise<IdbGrpcSession | undefined> {
+    if (this.grpcDisabled || !this.openGrpcSession) return undefined;
+    if (this.grpc) return this.grpc;
+    this.grpcOpening ??= (async () => {
+      try {
+        const session = await this.openGrpcSession!({
+          udid: this.config.udid,
+          idbBin: await this.resolveIdbBin(),
+        });
+        this.grpc = session;
+        if (!session) this.grpcDisabled = true;
+        return session;
+      } catch {
+        this.grpcDisabled = true;
+        return undefined;
+      }
+    })();
+    return this.grpcOpening;
+  }
+
   private async idb(args: string[], opts: { timeoutMs?: number } = {}): Promise<string> {
     const env = iosEnv(this.config.udid);
     const bin = await this.resolveIdbBin();
+    const op = mapIdbArgsToOp(args);
+    if (op) {
+      const session = await this.grpcSession();
+      if (session) {
+        try {
+          return await session.call(op, { timeoutMs: opts.timeoutMs });
+        } catch (err) {
+          if (!(err instanceof IdbGrpcTransportError)) throw err;
+          this.grpcDisabled = true;
+          this.grpc = undefined;
+          await session.close().catch(() => undefined);
+        }
+      }
+    }
     return this.run(bin, idbArgs(args, this.config.udid), { timeoutMs: opts.timeoutMs, env });
   }
 }

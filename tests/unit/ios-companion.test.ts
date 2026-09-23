@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defaultConfig } from "../../src/core/config.js";
+import { IdbGrpcTransportError } from "../../src/drivers/idb-session.js";
 import { cachedIdbWhich, ensureIdbCompanion, IosDriver } from "../../src/drivers/ios.js";
 
 describe("cachedIdbWhich", () => {
@@ -83,5 +84,106 @@ describe("IosDriver idb which cache", () => {
     await driver.snapshot();
     await driver.snapshot();
     expect(whichCalls).toBe(1);
+  });
+});
+
+describe("IosDriver gRPC session", () => {
+  it("sends mapped ops on the live session and skips the CLI", async () => {
+    const ops: string[] = [];
+    const cli: string[][] = [];
+    const driver = new IosDriver(defaultConfig().ios, "clear", {
+      which: async () => "/opt/idb",
+      execOk: async (_command, args) => {
+        cli.push(args);
+        return "[]";
+      },
+      openGrpcSession: async () => ({
+        call: async (op) => {
+          ops.push(op.op);
+          return "[]";
+        },
+        close: async () => undefined,
+      }),
+    });
+    await driver.snapshot();
+    expect(ops).toEqual(["describe-all"]);
+    expect(cli).toEqual([]);
+    await driver.close();
+  });
+
+  it("falls back to the CLI when the helper does not start", async () => {
+    const cli: string[][] = [];
+    const driver = new IosDriver(defaultConfig().ios, "clear", {
+      which: async () => "/opt/idb",
+      execOk: async (_command, args) => {
+        cli.push(args);
+        return "[]";
+      },
+      openGrpcSession: async () => undefined,
+    });
+    await driver.snapshot();
+    expect(cli[0]?.slice(0, 2)).toEqual(["ui", "describe-all"]);
+    await driver.close();
+  });
+
+  it("falls back to the CLI after a transport error", async () => {
+    let closed = false;
+    const cli: string[][] = [];
+    const driver = new IosDriver(defaultConfig().ios, "clear", {
+      which: async () => "/opt/idb",
+      execOk: async (_command, args) => {
+        cli.push(args);
+        return "[]";
+      },
+      openGrpcSession: async () => ({
+        call: async () => {
+          throw new IdbGrpcTransportError("helper died");
+        },
+        close: async () => {
+          closed = true;
+        },
+      }),
+    });
+    await driver.snapshot();
+    expect(cli[0]?.slice(0, 2)).toEqual(["ui", "describe-all"]);
+    expect(closed).toBe(true);
+    await driver.close();
+  });
+
+  it("does not CLI-retry application errors from the helper", async () => {
+    const cli: string[][] = [];
+    const driver = new IosDriver(defaultConfig().ios, "clear", {
+      which: async () => "/opt/idb",
+      execOk: async (_command, args) => {
+        cli.push(args);
+        return "[]";
+      },
+      openGrpcSession: async () => ({
+        call: async () => {
+          throw new Error("tap missed");
+        },
+        close: async () => undefined,
+      }),
+    });
+    await expect(driver.snapshot()).rejects.toThrow("tap missed");
+    expect(cli).toEqual([]);
+    await driver.close();
+  });
+
+  it("closes the gRPC session when the driver closes", async () => {
+    let closed = 0;
+    const driver = new IosDriver(defaultConfig().ios, "clear", {
+      which: async () => "/opt/idb",
+      execOk: async () => "[]",
+      openGrpcSession: async () => ({
+        call: async () => "[]",
+        close: async () => {
+          closed += 1;
+        },
+      }),
+    });
+    await driver.snapshot();
+    await driver.close();
+    expect(closed).toBe(1);
   });
 });
