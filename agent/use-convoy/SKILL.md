@@ -94,7 +94,7 @@ Skipped dirs: `node_modules`, `dist`, `.convoy`, `.git`. Passing a folder with n
 | Platform | Needs |
 |---|---|
 | `fixture` | Recorded screen JSON. No device, no API key. This repo uses `tests/fixtures/signin.json` |
-| `ios` | Mac, Xcode, iPhone simulator, simulator `.app` (not device `.ipa`), Facebook `idb` |
+| `ios` | Mac, Xcode, iPhone simulator, simulator `.app` (not device `.ipa`), Facebook `idb`. Companion is warmed once; dumps/taps reuse a live gRPC client (CLI fallback) |
 | `android` | `adb`, **already running** emulator/device, APK if Convoy should install |
 | `web` | `playwright` + Chromium, `CONVOY_WEB_BASE_URL` |
 
